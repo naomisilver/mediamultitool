@@ -1,0 +1,19 @@
+[project]
+name = "mediamultitool"
+version = "0.1.0"
+requires-python = ">= 3.11.9"
+description = "A multi-function cli tool to manage self hosted media"
+authors = [{name = "Naomi Silver", email = "naomisilver2002@gmail.com"}]
+readme = "README.md"
+license = "MIT"
+
+[project.scripts]
+mmt = "mediamultitool.mmt.cli:mmt"
+
+[tool.setuptools.package-data]
+mediamultitool = ["config.toml"]
+
+[project.urls]
+Homepage = "https://github.com/naomisilver/mediamultitool"
+Changelog = "https://github.com/naomisilver/mediamultitool/releases"
+Issues = "https://github.com/naomisilver/mediamultitool/issues"

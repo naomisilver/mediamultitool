@@ -1,0 +1,26 @@
+[app]
+# if you get errors on any informationn you place inside this file
+# ensure that they're placed in single quotes as apposed to double quotes
+
+[app.playlist]
+# the root volume of your music service container (i.e., Navidrome)
+container_root = '/music/'
+
+# the local path to your music library, either absolute path or network path
+# (e.g., \\10.0.0.2\\path\to\music or C:\path\to\music)
+local_music_path = ''
+
+# both work in the same way, where blacklist_strings is string to mever match (e.g., "(Live)")
+# whitelist_strings will retain the string in track (if found) (e.g., "(English ver.)")
+# seperate the strings using a comma (e.g., "(Live), (English ver.)") 
+blacklist_strings = ''
+whitelist_strings = ''
+
+[app.cleaner]
+# location of where you download/rip your albums to
+download_path = ''
+
+[app.misc]
+# versioning DO NOT CHANGE
+version = '0.1.0'
+
