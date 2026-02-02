@@ -119,3 +119,9 @@ def load_config() -> AppConfig:
 
 def open_config():
     print()
+
+"""
+    Sources/credit:
+        - Heavily inspired by: https://github.com/nathom/streamrip/blob/dev/streamrip/config.py
+            - new to making python packages and toml as a config format, dataclass etc... 
+"""
