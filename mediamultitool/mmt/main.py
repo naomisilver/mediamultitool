@@ -19,8 +19,8 @@ def run(args, cfg):
         if args.o_directory is not None:
             output_provided = True
 
-        blacklist_strs = cfg.playlist.blacklist_strings.split(",")
-        whitelist_strs = cfg.playlist.whitelist_strings.split(",")
+        blocklist_strs = cfg.playlist.blocklist_strings.split(",")
+        allowlist_strs = cfg.playlist.allowlist_strings.split(",")
         container_root = Path(cfg.playlist.container_root)
         local_music_path = Path(cfg.playlist.local_music_path)
 
@@ -32,7 +32,7 @@ def run(args, cfg):
 
             csv_files = [x for x in args.i_directory.iterdir() if x.suffix == ".csv"]
             for csv_file in csv_files:
-                run_playlist(text_file_path, csv_file, container_root, local_music_path, blacklist_strs, whitelist_strs)
+                run_playlist(text_file_path, csv_file, container_root, local_music_path, blocklist_strs, allowlist_strs)
 
         else:
             if output_provided:
@@ -41,7 +41,7 @@ def run(args, cfg):
                 text_file_path = args.i_directory.parent / "temp.txt" # if output not provided, take the parent of the input file and use that
             
             csv_file_path = args.i_directory 
-            run_playlist(text_file_path, csv_file_path, container_root, local_music_path, blacklist_strs, whitelist_strs)
+            run_playlist(text_file_path, csv_file_path, container_root, local_music_path, blocklist_strs, allowlist_strs)
 
     if args.command == "cleaner":
         dl_path = Path(cfg.cleaner.download_path)

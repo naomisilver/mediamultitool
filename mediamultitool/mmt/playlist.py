@@ -49,7 +49,7 @@ def create_text(file_path, csv_data, container_path):
 
             f.write(f"{track_data}\n") # write in the track data and new line that shit
 
-def search_music(file_path, music_path, container_path, blacklist_strs, whitelist_strs):
+def search_music(file_path, music_path, container_path, blocklist_strs, allowlist_strs):
     """ iterate temp.txt and search for the tracks in local storage """
 
     missing_tracks = 0
@@ -60,7 +60,7 @@ def search_music(file_path, music_path, container_path, blacklist_strs, whitelis
         for row in f:
             split_path = row.split("/")
             album_found = False
-            whitelist = False
+            allowlist = False
             search_roots = []
 
             album_path = None; artist_path = None; track_path = None
@@ -70,15 +70,15 @@ def search_music(file_path, music_path, container_path, blacklist_strs, whitelis
 
             csv_track = csv_track.split(" - ", 1)[0] # solves the case: "Smoke On The Water - Remastered 2012"
             
-            for s in whitelist_strs:
+            for s in allowlist_strs:
                 if s.lower() in csv_track.lower():
-                    whitelist = True
-                    whitelist_string = s
+                    allowlist = True
+                    allowlist_string = s
 
             csv_track = csv_track.split("(")[0].strip() # solves thte case: "I Love It (feat. Charli XCX)"
             
-            if whitelist:
-                csv_track = csv_track + f" {whitelist_string}"
+            if allowlist:
+                csv_track = csv_track + f" {allowlist_string}"
 
             # artist matching
             for artist in music_path.iterdir():
@@ -122,24 +122,24 @@ def search_music(file_path, music_path, container_path, blacklist_strs, whitelis
                 if track.suffix.lower() not in AUDIO_EXTS: # stops something like cover.jpg being considered as a track
                     continue
 
-                BLACKLIST = False
+                blocklist = False
 
                 track_name = track.stem
                 track_name = track_name.split(" - ", 1)[-1] # slightly messy but strips away without regex, takes away the "[Artist] -" from local files and keep the second part if there
                 track_name = track_name.split(" - ", 1)[0]  # performs it again if there's say "- remaster 2011" and then keeps the first
 
-                for s in blacklist_strs:
+                for s in blocklist_strs:
                     if s in track_name: # fixes case taylor swift "(commentary)"
-                        BLACKLIST = True
+                        blocklist = True
                 
-                if whitelist:
+                if allowlist:
                     pass
                 else:
                     track_name = track_name.split("(")[0].strip()
 
                 # partial matching now because of the above split being moved into an else statement, if "03. LE SSERAFIM - SPAGHETTI (Member ver.) (Remastered).flac" exists locally
                 # but csv shows: "SPAGHETTI (Member ver.)", it wouldn't match with exact string matching. Might need to bite the bullet and use regex *shudder*
-                if normalise(csv_track) in normalise(track_name) and not BLACKLIST:
+                if normalise(csv_track) in normalise(track_name) and not blocklist:
                     track_path = track.resolve() # get the absolute path
                     logger.info("Found track: %s ", track.name)
                     final_path_list.append(track_path) 
@@ -185,20 +185,24 @@ def convert_m3u8(file_path, csv_data):
     """ convert temp.txt file to m3u8 """
 
     p = Path(file_path) # ensure file_path is a Path object (100% unnecessary in deployment but useful for when isolating this function for testing)
-    playlist_name = csv_data[3]['Playlist name'] # extract the playlist name from the csv data
+    try:
+        playlist_name = csv_data[0]['Playlist name'] # extract the playlist name from the csv data
+    except IndexError:
+        logger.error("Provided CSV file contains no tracks")
+        
     m3u8_file = p.parent / f"{normalise(playlist_name)}.m3u8" # get the path and normalise the name (one of my personal playlists is just '?' which is an illegal char in windows)
     
     if m3u8_file.exists(): 
-        logger.info("m3u8 file of name: '%s.m3u8' already exists at '%s', overwriting", csv_data[3]['Playlist name'], p.parent)
+        logger.info("m3u8 file of name: '%s.m3u8' already exists at '%s', overwriting", csv_data[0]['Playlist name'], p.parent)
     
     logger.info("created/modified m3u8 file of name %s at %s", m3u8_file.stem, m3u8_file.parent)
     p.replace(m3u8_file)
 
-def run_playlist(text_file_path, csv_file_path, container_path, local_music_path, blacklist_strs, whitelist_strs):
+def run_playlist(text_file_path, csv_file_path, container_path, local_music_path, blocklist_strs, allowlist_strs):
     """ control function """
 
     csv_data = read_csv(csv_file_path)
     create_text(text_file_path, csv_data, container_path)
-    path_data = search_music(text_file_path, local_music_path, container_path, blacklist_strs, whitelist_strs)
+    path_data = search_music(text_file_path, local_music_path, container_path, blocklist_strs, allowlist_strs)
     recreate_text(text_file_path, path_data, local_music_path, container_path)
     convert_m3u8(text_file_path, csv_data)

@@ -23,8 +23,8 @@ CONFIG_FILE = CONFIG_DIR / "config.toml"
 class PlaylistConfig:
     container_root: str = '/music/'
     local_music_path: str = ''
-    blacklist_strings: str = ''
-    whitelist_strings: str = ''
+    blocklist_strings: str = ''
+    allowlist_strings: str = ''
 
 @dataclass(slots=True)
 class CleanerConfig:
