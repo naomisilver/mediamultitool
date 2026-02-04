@@ -10,11 +10,11 @@ container_root = '/music/'
 # (e.g., \\10.0.0.2\\path\to\music or C:\path\to\music)
 local_music_path = ''
 
-# both work in the same way, where blacklist_strings is string to mever match (e.g., "(Live)")
-# whitelist_strings will retain the string in track (if found) (e.g., "(English ver.)")
+# both work in the same way, where blocklist_strings is string to mever match (e.g., "(Live)")
+# allowlist_strings will retain the string in track (if found) (e.g., "(English ver.)")
 # seperate the strings using a comma (e.g., "(Live), (English ver.)") 
-blacklist_strings = ''
-whitelist_strings = ''
+blocklist_strings = ''
+allowlist_strings = ''
 
 [app.cleaner]
 # location of where you download/rip your albums to

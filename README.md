@@ -14,7 +14,7 @@ An automation tool used to aid in the management of self-hosted media services.
 - And more to come!
 
 # Installation
- <a href="https://pip.pypa.io/en/stable/installation/">pip</a> and <a href="https://www.python.org/downloads/">Python</a> 3.11.9 or greater is required.
+ <a href="https://pip.pypa.io/en/stable/installation/">pip</a>, <a href="https://git-scm.com/install/">git/Github Desktop</a> and <a href="https://www.python.org/downloads/">Python</a> 3.11.9 or greater is required.
 
 > no pypi install as this is a niche tool, will work on it if requested
 
