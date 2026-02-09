@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 """
     TODO:
-    
+        - I want to rewrite this script, I've drawn too heavy of inspiration from streamrip's config file when I need to learn more about toml as an utility
 """
 
 CONFIG_DIR = Path(user_config_dir(APP_NAME))
@@ -25,6 +25,7 @@ class PlaylistConfig:
     local_music_path: str = ''
     blocklist_strings: str = ''
     allowlist_strings: str = ''
+    default_output: str = ''
 
 @dataclass(slots=True)
 class CleanerConfig:
@@ -32,7 +33,7 @@ class CleanerConfig:
 
 @dataclass(slots=True)
 class Misc:
-    version: str = '0.1.0'
+    version: str = '0.1.1'
 
 @dataclass(slots=True)
 class AppConfig:
@@ -97,8 +98,6 @@ def sync_config_to_toml(toml_section, config) -> bool:
 
 def load_config() -> AppConfig:
     """ load the config and create if it doesn't exist """
-
-    #CONFIG_DIR.mkdir(parents=True, exist_ok=True) # moved this logic to cli.py as log is going to go in appdata before the config file would
 
     if not CONFIG_FILE.exists():
         copy(TEMPLATE_CONFIG_PATH, CONFIG_DIR)

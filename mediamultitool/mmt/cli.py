@@ -14,12 +14,6 @@ import webbrowser
 
 """
 TODO:   
-    - feature idea: a way to keep up to date on what music people are releasing
-        - iterdir through the entire local music folder, list out the artists and their albums, storing them in a a list of tuples where I can do artist[i].album[x] then query an
-          open/free music db to check their newest album. (I could use the year on the album: SAWTOWNE - Brainstorm (JP Ver.) (2025) [FLAC] [16B-44100kHz]) I would need to grab only the year
-          which likely means regex :vomit face:, then assign that album to "latest_album", check if there are any newer ones, then log those newer albums. Rate limiting will be an issue
-          so I need to ensure I'm only querering once per artist at the absolute worst. (if the music db stores dead artists or something, I could place those in a db file to save queries)
-
     - look at improving console logging by using rich
 """
 
@@ -44,33 +38,46 @@ class CustomFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt, datefmt="%m/%d/%y %H:%M:%S")
         return formatter.format(record)
 
-def validate_input(parser, args, cfg, APP_DIR):
+def validate_input(parser, args, cfg, APP_DIR): # there HAS to be a better way handle induvidual param validation ts getting out of control
     try:
         if args.command == "playlist":
-            if args.i_directory is None: # if directory is not provided
-                parser.error("-p/-playlist requires a path to operate on")
+            if args.input_param is None: # if directory is not provided
+                parser.error("-p/-playlist requires an input to operate on")
 
-            if os.path.isfile(args.i_directory):
+            if args.o_directory is not None:
+                if os.path.isfile(args.o_directory): # if output dir is a file
+                    parser.error("Output directory cannot be a file")
+
+            if args.o_directory is None: # if output dir is empty
+                if cfg.playlist.default_output == "": # and default output in config is empty, slap the users hand
+                    parser.error("Either an output needs to be given, or default output be defined in config, -c/--config toopen config file")
+                elif Path(cfg.playlist.default_output).is_dir():
+                    pass
+                else:
+                    parser.error("default output in the configuration file is not valid, please change, -c/--c to open config file")
+
+            if cfg.playlist.local_storage_path == "": # if a known required value isn't given, will rely on something else to get user to fill out config when other features are added
+                parser.error("-p/-playlist operation requires a path to local music files, -c/--config to open config file")
+            else:
+                if Path(cfg.playlist.local_storage_path).is_dir():
+                    pass
+                else:
+                    parser.error("path to local storage is not quite right, please ensure this is correct")
+
+            if os.path.isfile(Path(args.input_param)):
                 if args.recursive: # if directory given is a file AND recursive is selected
                     parser.error("Cannot recursively generate a playlist from a single file")
                 pass
 
-            if os.path.isdir(args.i_directory):
+            if os.path.isdir(Path(args.input_param)):
                 for file in args.i_directory.iterdir():
-                    if file.suffix.lower() == ".csv":
+                    if file.suffix.lower() == ".csv": # TODO replace with gen expr
                         continue
                     else:
                         parser.error("Input directory requires csv file to operate on")
                 if not args.recursive: # if directory given is the parent folder and recursive isn't selected
                     parser.error("Directories require the -r/-recursive flag")
                 pass
-
-            if args.o_directory is not None:
-                if os.path.isfile(args.o_directory):
-                    parser.error("Output directory cannot be a file")
-        
-        if cfg.playlist.local_storage_path == "": # if a known required value isn't given, will rely on something else to get user to fill out config when other features are added
-            parser.error("Required fields in config are not filled out... (Run 'mmt -c' to open config)")
 
     except AttributeError:
         pass
@@ -123,7 +130,7 @@ def mmt():
 
     # playlist subparsing
     playlist_parser = subparsers.add_parser("playlist", aliases=["p"], parents=[common_parser])
-    playlist_parser.add_argument("i_directory", nargs="?", type=Path, help="Input directory") # these may not stay part of the sub parser, depends on future features
+    playlist_parser.add_argument("input_param", nargs="?", type=str, help="Input Parameter (link to playlist or path to csv file)") # these may not stay part of the sub parser, depends on future features
     playlist_parser.add_argument("o_directory", nargs="?", type=Path, help="Output directory") # at which they will be adjusted
     playlist_parser.set_defaults(command="playlist") 
 

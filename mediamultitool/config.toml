@@ -16,6 +16,9 @@ local_music_path = ''
 blocklist_strings = ''
 allowlist_strings = ''
 
+# default output directory for m3u8 files
+default_output = ''
+
 [app.cleaner]
 # location of where you download/rip your albums to
 download_path = ''

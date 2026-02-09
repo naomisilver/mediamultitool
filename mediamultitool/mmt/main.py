@@ -1,5 +1,5 @@
-from .playlist import run_playlist
-from .cleaner import run_cleaner
+from .cleaner.cleaner import run_cleaner
+from .playlist.import_csv import convert_csv
 
 from pathlib import Path 
 import logging
@@ -16,32 +16,26 @@ def run(args, cfg):
     start_time = time.time()
 
     if args.command == "playlist":
-        if args.o_directory is not None:
-            output_provided = True
 
         blocklist_strs = cfg.playlist.blocklist_strings.split(",")
         allowlist_strs = cfg.playlist.allowlist_strings.split(",")
         container_root = Path(cfg.playlist.container_root)
         local_music_path = Path(cfg.playlist.local_music_path)
 
-        if args.recursive:
-            if output_provided:
-                text_file_path = args.o_directory / "temp.txt"
-            else:
-                text_file_path = args.i_directory / "temp.txt"
-
-            csv_files = [x for x in args.i_directory.iterdir() if x.suffix == ".csv"]
-            for csv_file in csv_files:
-                run_playlist(text_file_path, csv_file, container_root, local_music_path, blocklist_strs, allowlist_strs)
-
+        if args.o_directory is not None: # stopped defaulting to the input file location as an output because there wouldn't be one for a url, cleans up run slightly too
+            output_file_path = args.o_directory
         else:
-            if output_provided:
-                text_file_path = args.o_directory / "temp.txt" # output will always be a dir not a file and is checked in cli so can work with known good data
-            else:
-                text_file_path = args.i_directory.parent / "temp.txt" # if output not provided, take the parent of the input file and use that
-            
-            csv_file_path = args.i_directory 
-            run_playlist(text_file_path, csv_file_path, container_root, local_music_path, blocklist_strs, allowlist_strs)
+            output_file_path = Path(cfg.playlist.default_output)
+
+        if args.recursive:
+            csv_files = [x for x in Path(args.input_param).iterdir() if x.suffix == ".csv"] # make list of csv files
+            for csv_file in csv_files:
+                convert_csv(csv_file, local_music_path, container_root, blocklist_strs, allowlist_strs, output_file_path)
+
+        else: 
+            csv_file_path = Path(args.input_param) 
+            convert_csv(csv_file_path, local_music_path, container_root, blocklist_strs, allowlist_strs, output_file_path) # toying with the idea of creating a "PlaylistConfig" dataclass
+            # to host all these values 
 
     if args.command == "cleaner":
         dl_path = Path(cfg.cleaner.download_path)
