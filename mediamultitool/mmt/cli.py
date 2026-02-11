@@ -124,14 +124,14 @@ def mmt():
     
     # all common options (shared across commands)
     common_parser = argparse.ArgumentParser(add_help=False)
-    common_parser.add_argument("-r", "--recursive", action="store_true", help="perform action recursively")
+    common_parser.add_argument("-r", "--recursive", action="store_true", help="perform action recursively") # this is going to be depricated in the future
 
     subparsers = parser.add_subparsers(dest="command", title="subcommands")
 
     # playlist subparsing
     playlist_parser = subparsers.add_parser("playlist", aliases=["p"], parents=[common_parser])
-    playlist_parser.add_argument("input_param", nargs="?", type=str, help="Input Parameter (link to playlist or path to csv file)") # these may not stay part of the sub parser, depends on future features
-    playlist_parser.add_argument("o_directory", nargs="?", type=Path, help="Output directory") # at which they will be adjusted
+    playlist_parser.add_argument("input_param", nargs="+", type=str, help="Input Parameter (link to playlist or path to csv file)") # moving away from either single csv or dir of csv in
+    playlist_parser.add_argument("-o", "--output", dest="output_dir", type=Path, help="Output directory") # favour of multiple inputs, with an optional output flag
     playlist_parser.set_defaults(command="playlist") 
 
     # cleaner subparsing

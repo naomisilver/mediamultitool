@@ -1,4 +1,5 @@
-from ..models import Track
+from ..models import Track, PlaylistConfig
+
 from .create_m3u8 import create_m3u8
 from .normalise import normalise
 
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 AUDIO_EXTS = {".flac", ".mp3", ".m4a", ".wav", ".ogg", ".aac", ".alac", ".aiff"}
 
-def get_container_path(track_paths, music_path, container_root):
+def get_container_path(track_paths, music_path, pl_cfg):
     """ removes the absolute path portion from the audio file path and prepends the container root provided in config.toml """
     container_paths = []
 
@@ -27,11 +28,15 @@ def get_container_path(track_paths, music_path, container_root):
     return container_paths
 
 
-def search_music(tracks, music_path, container_root, blocklist_strs, allowlist_strs, playlist_name, output_file_path):
+def search_music(tracks, pl_cfg: object, playlist_name):
     """ iterate tracks and search for the tracks in local storage """
+    allowlist_strs = pl_cfg.allowlist_strs
+    blocklist_strs = pl_cfg.blocklist_strs
+    music_path = pl_cfg.local_music_path
+
     missing_tracks = 0
     full_path_list = []
-    network_path = str(music_path)
+    network_path = str(pl_cfg.local_music_path)
 
     for t in tracks:
         search_roots = []
@@ -133,6 +138,6 @@ def search_music(tracks, music_path, container_root, blocklist_strs, allowlist_s
     
     logger.info("Successfully matched %s tracks", len(full_path_list))
 
-    container_paths = get_container_path(full_path_list, music_path, container_root)
+    container_paths = get_container_path(full_path_list, music_path, pl_cfg)
 
-    create_m3u8(container_paths, playlist_name, output_file_path)
+    create_m3u8(container_paths, pl_cfg, playlist_name)

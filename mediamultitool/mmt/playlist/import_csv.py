@@ -19,7 +19,7 @@ def parse_csv(file_path):
 
         return reader_obj
     
-def convert_csv(csv_file_path, local_music_path, container_root, blocklist_strs, allowlist_strs, output_file_path):
+def convert_csv(csv_file_path, pl_cfg: object):
     """ take the outputted reader_obj and assign it's dictionary values to Track object values """
     track_list = []
 
@@ -39,5 +39,5 @@ def convert_csv(csv_file_path, local_music_path, container_root, blocklist_strs,
             )
         )
 
-    search_music(track_list, local_music_path, container_root, blocklist_strs, allowlist_strs, playlist_name, output_file_path)
+    search_music(track_list, pl_cfg, playlist_name)
     
