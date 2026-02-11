@@ -38,10 +38,10 @@ The following will give a `.m3u8` file, with name of the Playlist name value in 
 mmt playlist "/path/to/csv_data.csv"
 ```
 
-To output to a different location, you can:
+To output to a specific location, you can (otherwise the `default_output` value from config.toml will be used):
 
 ```
-mmt playlist "/path/to/csv_data.csv" "/path/to/output"
+mmt playlist "/path/to/csv_data.csv" -o "/path/to/output"
 ```
 
 To process an entire directory of `.csv` files, you can use the `-r` flag:
@@ -49,6 +49,13 @@ To process an entire directory of `.csv` files, you can use the `-r` flag:
 ```
 mmt playlist -r "/path/to/csv directory" "/path/to/output"
 ```
+
+Or alternatively, you can process multiple `.csv` files by providing multiple input paths:
+
+```
+mmt playlist "/path/to/csv file 1" "/path/to/csv file 2" 
+```
+
 This only highlights the playlist tool, for more detailed usages and specific tool documentation, see the <a href="https://github.com/naomisilver/mediamultitool/wiki">wiki</a>
 
 # Issues/feature requests/contributions
