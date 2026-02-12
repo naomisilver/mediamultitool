@@ -2,6 +2,11 @@
 # if you get errors on any informationn you place inside this file
 # ensure that they're placed in single quotes as apposed to double quotes
 
+# you only need the API keys for the services you want to convert playlists from
+[app.apis]
+# last.fm api key used only when tracks and artists when retrieving playlist data from last.fm
+lastfm_api_key = ''
+
 [app.playlist]
 # the root volume of your music service container (i.e., Navidrome)
 container_root = '/music/'
@@ -16,11 +21,14 @@ local_music_path = ''
 blocklist_strings = ''
 allowlist_strings = ''
 
+# default output directory for m3u8 files
+default_output = ''
+
 [app.cleaner]
 # location of where you download/rip your albums to
 download_path = ''
 
 [app.misc]
 # versioning DO NOT CHANGE
-version = '0.1.0'
+version = '0.1.2'
 

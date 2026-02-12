@@ -5,13 +5,13 @@
 An automation tool used to aid in the management of self-hosted media services.
 
 # Features
-- Take exported Spotify playlist csv data from <a href="https://www.tunemymusic.com/home">Tune My Music</a> and convert it to an m3u8 playlist file from local storage, ready for importing into Navidrome or similar.
+- Takes playlists from online music providers like [last.fm](https://www.last.fm) or `.csv` Spotify exports from [TuneMyMusic](https://www.tunemymusic.com/) and converts them to an `.m3u8` file, containing the correct paths for importing into [Navidrome](https://www.navidrome.org/) (or any other platforms that support `.m3u`/`.m3u8`).
     - From: `"Chic 'N' Stu","System Of A Down","Steal This Album!","Example Playlist","Playlist","USSM10213322","11i33j50Gsr90pRoDJBrEA"`
     - To: `/music/System Of A Down/System Of A Down - Steal This Album! (2002) [FLAC] [16B-44.1kHz]/01. System Of A Down - Chic 'N' Stu.flac`
     - A reletively robust search, it can match when spotify pairs a song to it's single release and only the album release is stored locally
-    - Configurable blacklist/whitelist strings that allow for finer controll over "(live)" or "(English ver.)" of songs
+    - Configurable blacklist/whitelist strings that allow for finer control over "(live)" or "(English ver.)" of songs
 - A "cleaner" tool that will clean a download folder of empty/failed downloads and move an artist's albums into their artist directory, ready for transferring
-- And more to come!
+- And more to come! (support for [Spotify](https://open.spotify.com/), [qobuz](https://www.qobuz.com), [deezer](https://www.deezer.com/) coming soon!)
 
 # Installation
  <a href="https://pip.pypa.io/en/stable/installation/">pip</a>, <a href="https://git-scm.com/install/">git/Github Desktop</a> and <a href="https://www.python.org/downloads/">Python</a> 3.11.9 or greater is required.
@@ -38,10 +38,16 @@ The following will give a `.m3u8` file, with name of the Playlist name value in 
 mmt playlist "/path/to/csv_data.csv"
 ```
 
-To output to a different location, you can:
+To process a last.fm playlist, supply a last.fm API key from [here](https://www.last.fm/api/authentication), and place it in `config.toml`, then, provided the playlist is public. You can do:
 
 ```
-mmt playlist "/path/to/csv_data.csv" "/path/to/output"
+mmt playlist https://www.last.fm/user/example/playlists/playlistId
+```
+
+To output to a specific location, you can (otherwise the `default_output` value from config.toml will be used):
+
+```
+mmt playlist "/path/to/csv_data.csv" -o "/path/to/output"
 ```
 
 To process an entire directory of `.csv` files, you can use the `-r` flag:
@@ -49,6 +55,13 @@ To process an entire directory of `.csv` files, you can use the `-r` flag:
 ```
 mmt playlist -r "/path/to/csv directory" "/path/to/output"
 ```
+
+Or alternatively, you can process multiple `.csv` files by providing multiple input paths:
+
+```
+mmt playlist "/path/to/csv file 1" "/path/to/csv file 2" 
+```
+
 This only highlights the playlist tool, for more detailed usages and specific tool documentation, see the <a href="https://github.com/naomisilver/mediamultitool/wiki">wiki</a>
 
 # Issues/feature requests/contributions
@@ -59,7 +72,8 @@ Any feedback or input is massively helpful, while I'm building this tool primari
 # Roadmap
 > This tool, as mentioned is earlier, is built for my own use case (and out of annoyance switching between self hosted platforms) and currently it does what *I* need it to do, that does not mean I'm against adding features I don't intend use.
 
-- As the playlist script is setup in such a way that the search music function only expects a `.txt` file, with a minor refactor, I can support many more playlist exports that I can extract the `Artist`, `Album` and `Track` names.
-  - This means I can integrate <a href="https://www.last.fm/">last.fm</a> playlists or converting jellyfin music playlist files to `.m3u8`
-- In keeping with the name, I would include a tool that can search for new albums from the artists stored locally (so you can go out and buy them of course), this would include pulling all artist names and the latest album from each, using the release year from the album name, and comparing that album to their latest release (with some configurable options for single/no single, remaster/no remaster. Likely using something like `TheAudioDB` or `Last.fm`, depending on the format of information I can pull.
+- With [last.fm](https://www.last.fm) integration, I'm fairly confident I can now support qobuz playlist importing as I will need to use a very similar process. Deezer is not something I've looked too deeply into and spotify will require their API. Though none of this should be awfully difficult.
+  - I'm unsure if Spotify can output JSON playlist data (I would suspect yes), I know they can provide CSV files but idk. 
+- In keeping with the name, I would include a tool that can search for new albums from the artists stored locally (so you can go out and buy them of course), this would include pulling all artist names and the latest album from each, using the release year from the album name, and comparing that album to their latest release (with some configurable options for single/no single, remaster/no remaster). Likely using something like `Last.fm`.
 - This program was intended as a sink for all my single use scripts I've made in the couple years but many of my non-music based scripts have been replaced by tools like filebot so don't have much of a place here anymore, and with all current future possible features being music related, this tool may get a name change :P
+  - this is becoming more and more likely, there isn't really an alternative to this tool (that doesn't require paying for, or the self-hosted services to be publically accessible) and I feel bad bogging down a potentially incredible tool with little things I want
