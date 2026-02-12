@@ -58,7 +58,7 @@ def run(args, cfg):
 
             else:
                 for i in input_params: # args.input_param now gives a list so iterate through
-                    csv_file_path = Path(input) 
+                    csv_file_path = Path(i) 
                     convert_csv(csv_file_path, playlist_cfg)
 
     if args.command == "cleaner":
