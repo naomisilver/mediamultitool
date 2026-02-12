@@ -16,11 +16,11 @@ TODO:
 
 def run(args, cfg):
     """ main control function """
-    input_params = args.input_param 
     output_provided = False
     start_time = time.time()
 
     if args.command == "playlist":
+        input_params = args.input_param 
 
         if args.output_dir is not None: # stopped defaulting to the input file location as an output because there wouldn't be one for a url, cleans up run slightly too
             output_dir = Path(args.output_dir)
