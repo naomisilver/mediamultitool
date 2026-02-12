@@ -99,15 +99,15 @@ def mmt():
         encoding="utf-8"
     )
     file_handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s: %(message)s", datefmt="%m/%d/%y %H:%M:%S"))
+    file_handler.setLevel(logging.DEBUG)
 
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(CustomFormatter())
 
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
-    root_logger.addHandler(file_handler)
-    root_logger.addHandler(console_handler)
+    pkg_logger = logging.getLogger("mediamultitool")
+    pkg_logger.setLevel(logging.INFO) # i nearly ragged my hair out, trying to diagnose an API issue ran it in verbose and got an ungodly amount of shite from selenium
+    pkg_logger.addHandler(file_handler) # also turns out this is better practice anyway, see refs
+    pkg_logger.addHandler(console_handler)
 
     logger = logging.getLogger(__name__)
 
@@ -141,10 +141,10 @@ def mmt():
     args = parser.parse_args()
 
     try:
-        if args.verbose:
-            console_handler.setLevel(logging.DEBUG)
         if args.quiet:
-            console_handler.setLevel(logging.ERROR) 
+            pkg_logger.setLevel(logging.ERROR) 
+        if args.verbose:
+            pkg_logger.setLevel(logging.DEBUG)
     except AttributeError:
         pass
 
@@ -177,4 +177,11 @@ if __name__ == "__main__":
 
         - Logging module in gen:    https://www.dash0.com/guides/logging-in-python
                                     https://docs.python.org/3/howto/logging.html
+
+        - pkg_logger:               https://www.reddit.com/r/learnpython/comments/1fcygqa/whats_the_best_way_to_include_a_logger_in_a/
+            - stumbled onto the best practice for loggers, never format the root_logger as that is what is imported by other packages
+              this way the logger specific to this package when run as an application will have the pretty colours and formatting
+              but when imported will not.
+            - TL;DR, mediamultitool run as a user is the parent so I control the logging output and handlers and stuff, when imported,
+              it is a child and so the parent program should dictate logging output (though I doubt this'll ever get imported to another proj)
 """

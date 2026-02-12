@@ -12,6 +12,21 @@ logger = logging.getLogger(__name__)
 
 AUDIO_EXTS = {".flac", ".mp3", ".m4a", ".wav", ".ogg", ".aac", ".alac", ".aiff"}
 
+"""
+TODO
+    - Currently, "30 Seconds To Mars" is stored in spotify as "Thirty Seconds To Mars", meaning none of this current logic can account for that. The plan is
+      to setup an "aliases" set that I can give known bad data, like the afformentioned, and assign it new aliases and I can be somewhat cheeky with and do:
+      artist_alises = {
+            "30 seconds to mars": {"thirty seconds to mars"}
+            "thirty seconds to mars": {"30 seconds to mars"}
+      }
+      this means I don't break compatibility if a music provider changes it's alias for them or it's different locally for another user, however, I am yet
+      again feature creeping myself when I need to do small updates :P, will come soon and will document in issues
+
+      even better, I can put this in the config with a bunch of defaults as examples (also means I don't need to account for absolutely everything
+      like how I handle blocklist/allowlist strings)
+"""
+
 def get_container_path(track_paths, music_path, pl_cfg):
     """ removes the absolute path portion from the audio file path and prepends the container root provided in config.toml """
     container_paths = []

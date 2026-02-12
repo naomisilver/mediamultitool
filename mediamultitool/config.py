@@ -20,6 +20,10 @@ TEMPLATE_CONFIG_PATH = Path(__file__).with_name("config.toml")
 CONFIG_FILE = CONFIG_DIR / "config.toml"
 
 @dataclass(slots=True)
+class APIKeys:
+    lastfm_api_key: str = ''
+
+@dataclass(slots=True)
 class PlaylistConfig:
     container_root: str = '/music/'
     local_music_path: str = ''
@@ -33,10 +37,11 @@ class CleanerConfig:
 
 @dataclass(slots=True)
 class Misc:
-    version: str = '0.1.1'
+    version: str = '0.1.2'
 
 @dataclass(slots=True)
 class AppConfig:
+    apis: APIKeys = field(default_factory=APIKeys)
     playlist: PlaylistConfig = field(default_factory=PlaylistConfig)
     cleaner: CleanerConfig = field(default_factory=CleanerConfig)
     misc: Misc = field(default_factory=Misc)

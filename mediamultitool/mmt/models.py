@@ -12,7 +12,8 @@ class PlaylistConfig:
     local_music_path: Path
     container_root: Path
     output_path: Path
-    blocklist_strs: list[str] = field(default_factory=list)
+    lastfm_api_key: str | None # nullable because a user may not want to convert last.fm playlists
+    blocklist_strs: list[str] = field(default_factory=list) # default to an empty list
     allowlist_strs: list[str] = field(default_factory=list)
 
 """
