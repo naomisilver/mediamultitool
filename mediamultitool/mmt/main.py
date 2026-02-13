@@ -33,7 +33,8 @@ def run(args, cfg):
             output_path = output_dir,
             lastfm_api_key = cfg.apis.lastfm_api_key,
             blocklist_strs = cfg.playlist.blocklist_strings.split(","),
-            allowlist_strs = cfg.playlist.allowlist_strings.split(",")
+            allowlist_strs = cfg.playlist.allowlist_strings.split(","),
+            artist_aliases = cfg.playlist.artist_aliases
         )
 
         input_param = [x for x in input_params if x.startswith("http")]
@@ -58,7 +59,7 @@ def run(args, cfg):
 
             else:
                 for i in input_params: # args.input_param now gives a list so iterate through
-                    csv_file_path = Path(input) 
+                    csv_file_path = Path(i) 
                     convert_csv(csv_file_path, playlist_cfg)
 
     if args.command == "cleaner":
