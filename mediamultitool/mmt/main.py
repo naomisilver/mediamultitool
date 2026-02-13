@@ -33,7 +33,8 @@ def run(args, cfg):
             output_path = output_dir,
             lastfm_api_key = cfg.apis.lastfm_api_key,
             blocklist_strs = cfg.playlist.blocklist_strings.split(","),
-            allowlist_strs = cfg.playlist.allowlist_strings.split(",")
+            allowlist_strs = cfg.playlist.allowlist_strings.split(","),
+            artist_aliases = cfg.playlist.artist_aliases
         )
 
         input_param = [x for x in input_params if x.startswith("http")]

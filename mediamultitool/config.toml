@@ -24,11 +24,17 @@ allowlist_strings = ''
 # default output directory for m3u8 files
 default_output = ''
 
+# below is where you should define alternative names for artists you find while using mmt
+# in the case where the artist "30 Seconds To Mars" is stored locally but in the playlist
+# data, it's defined as "Thirty Seconds To Mars" (you do not need to include the inverse order of names)
+[app.playlist.artist_aliases]
+"30 Seconds To Mars" = "Thirty Seconds To Mars"
+
 [app.cleaner]
 # location of where you download/rip your albums to
 download_path = ''
 
 [app.misc]
 # versioning DO NOT CHANGE
-version = '0.1.2'
+version = '0.1.3'
 
