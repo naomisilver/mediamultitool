@@ -30,7 +30,6 @@ class PlaylistConfig:
     blocklist_strings: str = ''
     allowlist_strings: str = ''
     default_output: str = ''
-    artist_aliases: dict[str, str] = field(default_factory=dict)
 
 @dataclass(slots=True)
 class CleanerConfig:
@@ -38,7 +37,7 @@ class CleanerConfig:
 
 @dataclass(slots=True)
 class Misc:
-    version: str = '0.1.3'
+    version: str = '0.1.2'
 
 @dataclass(slots=True)
 class AppConfig:

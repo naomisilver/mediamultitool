@@ -63,18 +63,6 @@ def search_music(tracks, pl_cfg: object, playlist_name):
 
         if "&" in raw_artist: # solves the case "&" in "macklemore & ryan lewis"
             raw_artist = raw_artist.split("&", 1)[0].strip()
-        if "-" in raw_artist:
-            raw_artist = raw_artist.replace("-", "") # was previously performing this normalisation in the artist matching section which meant it
-            # would not be performed, will look at moving these into a special rule (this time probably not definable by users)
-
-        artist_names = {raw_artist} # convert raw artist to a set
-
-        for key, value in pl_cfg.artist_aliases.items(): # solves the case: "30 Seconds to mars" locally, "Thirty Seconds To Mars" in playlist data
-            n_key = normalise(key)
-            n_value = normalise(value)
-
-            if raw_artist in {n_key, n_value}: # iterate through the the dictionary
-                artist_names.update({n_key, n_value}) # and normalise the provided values and add that to the artist_names set
 
         raw_album = raw_album.split("(")[0].strip() # solves the case: "Spawn The Album (Soundtrack)"
 
@@ -96,11 +84,11 @@ def search_music(tracks, pl_cfg: object, playlist_name):
 
             if "-" in folder_artist: # the ceelo green rule
                 folder_artist = folder_artist.replace("-", "")
+                raw_artist = raw_artist.replace("-", "")
 
-            for artist_name in artist_names:
-                if folder_artist == artist_name:
-                    artist_path = artist
-                    break
+            if folder_artist == raw_artist:
+                artist_path = artist
+                break
         
         if artist_path == None:
             missing_tracks += 1
@@ -168,11 +156,3 @@ def search_music(tracks, pl_cfg: object, playlist_name):
     container_paths = get_container_path(full_path_list, music_path, pl_cfg)
 
     create_m3u8(container_paths, pl_cfg, playlist_name)
-
-"""
-    Sources/credit:
-        - artist_aliases dict:  https://www.w3schools.com/python/python_dictionaries_add.asp
-                                https://stackoverflow.com/questions/38987/how-do-i-merge-two-dictionaries-in-a-single-expression-in-python
-                                https://stackoverflow.com/questions/483666/reverse-invert-a-dictionary-mapping
-            - i didn't uses the bottom two as that was the inital approach and didn't yet know the power of sets
-"""
