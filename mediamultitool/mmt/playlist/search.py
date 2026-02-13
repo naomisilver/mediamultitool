@@ -34,7 +34,7 @@ def get_container_path(track_paths, music_path, pl_cfg):
     for track in track_paths:
         relative_path = track.relative_to(music_path)
 
-        final_path = track / relative_path
+        final_path = pl_cfg.container_root / relative_path
 
         final_path = str(final_path).replace("\\", "/")
 
