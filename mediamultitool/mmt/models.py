@@ -1,11 +1,17 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-@dataclass
+@dataclass(slots=True) # supposedly slotted dataclasses are better than standard (__dict__?) https://news.ycombinator.com/item?id=41804093, like always, you can never get a straight answer :D
 class Track:
     artist: str
     album: str | None # nullable in case I can't find lastfm album name from api request
     track: str
+
+@dataclass(slots=True)
+class Artist:
+    artist_name: str
+    latest_album: str
+    all_albums: list[str]
 
 @dataclass(slots=True)
 class PlaylistConfig:
@@ -16,6 +22,11 @@ class PlaylistConfig:
     blocklist_strs: list[str] = field(default_factory=list) # default to an empty list
     allowlist_strs: list[str] = field(default_factory=list)
     artist_aliases: dict[str, str] = field(default_factory=dict)
+
+@dataclass(slots=True)
+class UpdaterConfig: # small now but will make things easier if I do move to automatic downloading via streamrip
+    local_music_path: Path
+    lastfm_api_key: str | None
 
 """
     Sources/credit:

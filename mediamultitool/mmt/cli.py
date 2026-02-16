@@ -138,6 +138,10 @@ def mmt():
     cleaner_parser = subparsers.add_parser("cleaner", aliases=["c"], parents=[common_parser])
     cleaner_parser.set_defaults(command="cleaner")
 
+    # updater subparsing
+    updater_parser = subparsers.add_parser("updater", parents=[common_parser]) # moving away from the single letter commands
+    cleaner_parser.set_defaults(command="updater")
+
     args = parser.parse_args()
 
     try:

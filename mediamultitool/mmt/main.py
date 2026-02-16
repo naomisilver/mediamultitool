@@ -1,8 +1,9 @@
 from .cleaner.cleaner import run_cleaner
 from .playlist.import_csv import convert_csv
 from .playlist.import_lastfm import scrape_lastfm_playlist
+from .updater.load_album import get_newest_album
 
-from .models import PlaylistConfig
+from .models import PlaylistConfig, UpdaterConfig
 
 from pathlib import Path 
 import logging
@@ -65,6 +66,19 @@ def run(args, cfg):
     if args.command == "cleaner":
         dl_path = Path(cfg.cleaner.download_path)
         run_cleaner(dl_path)
+
+    if args.command == "updater":
+        updater_cfg = UpdaterConfig(
+            local_music_path = Path(cfg.playlist.local_music_path), # will be moved into a "general" table in the config file
+            lastfm_api_key = cfg.apis.lastfm_api_key
+        )
+        artist_data = get_newest_album(updater_cfg)
+
+        for a in artist_data:
+            print(f"{a.artist_name}, {a.latest_album}")
+            #print(a.latest_album)
+            #print(a.all_albums)
+            #print(a)
 
     logger.info("Completed in: %s seconds", round(time.time() - start_time, 3))
 
