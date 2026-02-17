@@ -69,16 +69,9 @@ def run(args, cfg):
 
     if args.command == "updater":
         updater_cfg = UpdaterConfig(
-            local_music_path = Path(cfg.playlist.local_music_path), # will be moved into a "general" table in the config file
-            lastfm_api_key = cfg.apis.lastfm_api_key
+            local_music_path = Path(cfg.playlist.local_music_path) # will be moved into a "general" table in the config file
         )
-        artist_data = get_newest_album(updater_cfg)
-
-        for a in artist_data:
-            print(f"{a.artist_name}, {a.latest_album}")
-            #print(a.latest_album)
-            #print(a.all_albums)
-            #print(a)
+        get_newest_album(updater_cfg)
 
     logger.info("Completed in: %s seconds", round(time.time() - start_time, 3))
 

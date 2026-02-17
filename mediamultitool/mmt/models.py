@@ -11,7 +11,10 @@ class Track:
 class Artist:
     artist_name: str
     latest_album: str
-    all_albums: list[str]
+    all_albums: list[str] = field(default_factory=list)
+    mbid: str | None = None # I can query musicbrainz with a string of the artist name to get the mbid to then use to get accurate album releases :D
+    ended: bool = False # MUSICBRAINZ EXPOSES THIS YIPEPEEE
+
 
 @dataclass(slots=True)
 class PlaylistConfig:
@@ -26,7 +29,6 @@ class PlaylistConfig:
 @dataclass(slots=True)
 class UpdaterConfig: # small now but will make things easier if I do move to automatic downloading via streamrip
     local_music_path: Path
-    lastfm_api_key: str | None
 
 """
     Sources/credit:
