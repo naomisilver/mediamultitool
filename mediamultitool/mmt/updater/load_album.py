@@ -1,5 +1,5 @@
-from ..models import Artist, UpdaterConfig
-from .get_albums import process_artist_albums
+from ..models import LocalArtist, UpdaterConfig
+from .get_albums import process_local_artists
 
 from pathlib import Path
 import logging
@@ -43,6 +43,7 @@ def regex_tag_check(s):
         if len(tags) == 1: # using regex ive yet to be given more than 1 tag that matches, but if at any point theres more, I can look at the two tags and create rules for that
             # kinda hard to write catches for data I don't know of
             return int(tag.replace("(", "").replace(")", ""))
+            #return tag
         
         if len(tags) >= 2:
             if newest_tag == 0:
@@ -52,6 +53,7 @@ def regex_tag_check(s):
                 newest_tag = tag
 
             return int(newest_tag.replace("(", "").replace(")", ""))
+            #return newest_tag
         
         else:
             logger.error("Found multiple potential tag matches: %s, please open an issue showing this message.", s)
@@ -64,7 +66,7 @@ def normalise_album(s): # was going to use regex but not really necessary when a
 
     return s
 
-def get_newest_album(upd_cfg: UpdaterConfig):
+def get_newest_album(upd_cfg: UpdaterConfig) -> LocalArtist:
     """ retrieve artists and their latest albums """
 
     music_path = upd_cfg.local_music_path
@@ -97,14 +99,14 @@ def get_newest_album(upd_cfg: UpdaterConfig):
             except TypeError as e:
                 logger.error("TypeError, %s attempting to compare %s to %s. Source: %s", e, regex_tag_check(album), newest_album_year, album)
 
-        artist_data.append(Artist(
+        artist_data.append(LocalArtist(
             artist_name = artist_name,
-            latest_album = normalise_album(newest_album), # before adding to the Artist object, I could really do with normalising/generalising it similar to playlist, though I really don't feel like
+            latest_album = f"{normalise_album(album)} ({regex_tag_check(album)})", # before adding to the Artist object, I could really do with normalising/generalising it similar to playlist, though I really don't feel like
             # mirroring the same logic so will look at how I could handle it using regex. 
-            all_albums = [normalise_album(album) for album in all_albums] # god I love list comprehension
-        ))
+            all_albums = [f"{normalise_album(album)} ({regex_tag_check(album)})" for album in all_albums] # god I love list comprehension
+        )) # in my test script, I retained the release year in the as it should help to give another way to match data later
 
-    process_artist_albums(upd_cfg, artist_data)
+    process_local_artists(upd_cfg, artist_data)
 
 """
     Sources/credit:

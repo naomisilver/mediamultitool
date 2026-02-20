@@ -1,4 +1,5 @@
-from ..models import Artist, UpdaterConfig
+from ..models import LocalArtist, CachedArtist, UpdaterConfig
+from ..core.db import Database
 
 import requests
 import logging
@@ -21,6 +22,11 @@ import time
 
 API_ROOT = "https://musicbrainz.org/ws/2"
 
+one_minute_unix_time = 60
+one_hour_unix_time = 3600
+one_day_unix_time = 86400 # somewhat temporary while testing
+one_week_unix_time = 604800
+
 session = requests.session()
 logger = logging.getLogger(__name__)
 
@@ -28,8 +34,8 @@ header = {
     'user-agent': 'mediamultitool (by naomisilver2002@gmail.com)' # mb's big thing is be good to the source so I'm trying to be :D
 }
 
-def fetch_artist_mbid(artist: Artist): # i kinda hated function annotations because clutter but now I'm working across multiple files with multiple functions it's quite nice
-    a_name = artist.artist_name
+def fetch_artist_mbid(a_name) -> CachedArtist: # i kinda hated function annotations because clutter but now I'm working across multiple files with multiple functions it's quite nice
+    """ fetches artist mbid of a provided local artist """
 
     payload = {
         'query': a_name, # fuzzy search
@@ -46,28 +52,58 @@ def fetch_artist_mbid(artist: Artist): # i kinda hated function annotations beca
 
         if data["artists"][0]["life-span"]["ended"]: # praise the lord they expose this, will probably save all albums to ended artists on the first run then
             # rarely if ever recheck
-            artist.ended = True # https://www.youtube.com/watch?v=neJpZTAu-Ig (i'm slowly losing my mind)
+            ended = True # https://www.youtube.com/watch?v=neJpZTAu-Ig (i'm slowly losing my mind)
         else: 
-            artist.ended = False
+            ended = False
 
-        artist.mbid = data["artists"][0]["id"] 
+        artist_mbid = data["artists"][0]["id"] 
 
     except IndexError as e: # for times when it doesn't return anything
-        logger.error("IndexError %s when attempting to retrieve data on: %s", e, artist.artist_name)
+        logger.error("IndexError %s when attempting to retrieve data on: %s", e, a_name)
 
-    return artist
+    return CachedArtist(
+        artist_mbid = artist_mbid,
+        artist_name = a_name,
+        ended = ended
+    )
 
 def fetch_artist_albums():
     pass # going to work on local caching before implementing this
 
-def process_artist_albums(upd_cfg: UpdaterConfig, artist_data: list[Artist]):
+def process_local_artists(upd_cfg: UpdaterConfig, artist_data: LocalArtist):
+    """ decide based on local data what to do 
+    
+        will get moved to a "pipeline" method when the modules get turned into classes
+    """
+
+    db = Database()
+    
     for artist in artist_data:
-        time.sleep(1.1) # will make a more elegant rate limit solution in the future 
-        logger.warning("%s | %s | %s", artist.artist_name, artist.mbid, artist.ended)
-        fetch_artist_mbid(artist)
-        logger.info("%s | %s | %s", artist.artist_name, artist.mbid, artist.ended)
+        a = db.is_exists(artist.artist_name) # returns a CachedArtist object containing all the current DB data
+        if a is None: # if not in DB
+            a = fetch_artist_mbid(artist.artist_name)
+            time.sleep(1.1) # RATE LIMIT I DONT WANNA GET IP BANNED BY LIKE THE ONLY 99.9% RELIABLE SOURCE FOR THIS DATA
+            print(a)
+            # b = fetch_artist_albums(a)
+            # call fetch_albums here, get the albums from musicbrainz, split according to their release group then I get back a fully completed "CachedArtist"
+            # at which point I can call db.add(b) to add it into the database. 
+        
+        if int(time.time()) - a.last_checked > one_week_unix_time: 
+            pass # check if the current artist is outdated, if it is, call fetch_artist_album and pass in a (the retrieved artist record) and overwrite the existing
+            # record doing db.add(b)
 
+            # once all records have been updated (calling is_stale()) likely just on request, though I feel it'll happen anyway so I don't really know the best way
+            # forward, but I do need some sleep 
 
+            # then in each "if" I can make a search_mbid method in db.py using the mbid to retrieve the now updated records, compare and contrast to those locally
+            # and output the missing/newest albums. Will need to isolate both updating records and doing the comparison
+        
+        fetch_artist_albums()
+
+    #outdated = db.is_stale()
+    
+    #for o in outdated:
+        #to_process.append(o)
 
 """
     Sources/credit:

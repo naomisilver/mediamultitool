@@ -8,13 +8,20 @@ class Track:
     track: str
 
 @dataclass(slots=True)
-class Artist:
+class LocalArtist: # represents what was found locally
     artist_name: str
     latest_album: str
     all_albums: list[str] = field(default_factory=list)
-    mbid: str | None = None # I can query musicbrainz with a string of the artist name to get the mbid to then use to get accurate album releases :D
-    ended: bool = False # MUSICBRAINZ EXPOSES THIS YIPEPEEE
 
+@dataclass(slots=True)
+class CachedArtist: # represents what I got back from musicbrainz/what exists in the db cache
+    artist_mbid: str 
+    artist_name: str
+    ended: int = 0
+    last_checked: int = 0 # using unix timestamp, take the current timestamp, subtract what is stored in db, if longer than 604,800 (a week) then update local cache
+    studio_albums: list[str] = field(default_factory=list)
+    singles: list[str] = field(default_factory=list)
+    eps: list[str] = field(default_factory=list)
 
 @dataclass(slots=True)
 class PlaylistConfig:
