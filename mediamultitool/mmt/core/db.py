@@ -44,6 +44,7 @@ class Database:
         c.execute("""CREATE TABLE artists (
                   artist_mbid text PRIMARY KEY,
                   artist_name text NOT NULL UNIQUE,
+                  artist_locale text NOT NULL,
                   ended integer NOT NULL,
                   last_checked integer NOT NULL,
                   singles text,
@@ -82,11 +83,12 @@ class Database:
         return CachedArtist(
             artist_mbid = row[0],
             artist_name = row[1],
-            ended = row[2],
-            last_checked = row[3],
-            singles = json.loads(row[4]),
-            studio_albums = json.loads(row[5]),
-            eps =  json.loads(row[6])
+            artist_locale = row[2],
+            ended = row[3],
+            last_checked = row[4],
+            singles = json.loads(row[5]),
+            studio_albums = json.loads(row[6]),
+            eps =  json.loads(row[7])
         )
         
     def is_stale(self) -> list[CachedArtist]:
@@ -112,11 +114,12 @@ class Database:
             outdated.append(CachedArtist(
                 artist_mbid = row[0],
                 artist_name = row[1],
-                ended = row[2],
-                last_checked = row[3],
-                singles = json.loads(row[4]),
-                studio_albums = json.loads(row[5]),
-                eps =  json.loads(row[6])
+                artist_locale = row[2],
+                ended = row[3],
+                last_checked = row[4],
+                singles = json.loads(row[5]),
+                studio_albums = json.loads(row[6]),
+                eps =  json.loads(row[7])
             ))
 
         return outdated
@@ -131,6 +134,7 @@ class Database:
                 INSERT INTO artists (
                     artist_mbid,
                     artist_name,
+                    artist_locale,
                     ended,
                     last_checked,
                     studio_albums,
@@ -150,6 +154,7 @@ class Database:
                     (
                     artist.artist_mbid,
                     artist.artist_name,
+                    artist.artist_locale,
                     int(artist.ended),
                     artist.last_checked,
                     json.dumps(artist.studio_albums),

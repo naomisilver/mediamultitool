@@ -5,20 +5,30 @@ import requests
 import logging
 import time
 
-# so, in a test script, I was toying around with lastfm's API methods that could potentially work. I'd settled on using either "artist.getTopAlbums" or "artist.getInfo"
-# both with pretty major tradeoffs. getTopAlbums, yes, gives me 50 of that artist's top albums, but using Jay-z as my test data it would spit out the top 7 as
-# studio albums, but at "rank 8" it gave me: "Numb / Encore: MTV Ultimate Mash-Ups Presents Collision Course", which is just noise and appears before the actual
-# collision course albums appears, and with no real way to see if something is a single/ep/album etc...
+"""
+    - TODO:
+        - Implement something to scroll another page even after the "score_thresh" flag is triggered to see if that can help capture any missed releases and allowing
+          me to increase the score_floor to weed out some of the noise
 
-# getInfo returns their wiki entry (which is user generated content) and it would include the things I need (album names and their release year AND list studio albums)
-# but with it being user generated, it could be wrong, outdated, or not even there. Then there's the need to actually extract that information from a massive paragraph
-# and it doesn't seem consistent so can't really rely on that.
+        - see if there's anything I can do to exlcude track single releases that later end up in an album so that only the unique singles stick (i fear I won't be able
+          to do much as I don't think that information will be exposed by musicbrainz)
 
-# I'm looking into using musicbrainz as an alternative and has the added benefit of not needing an API key to access it, just crazy rate limiting
+        - some EPs are shown to be a studio album release AND an ep so my current setup capture both and place them both in, not necessarily a massive issue but I need
+          to see how prolific it is, if there's nothing I can do in the fetch_album func, I should be able to check if it's in EP then I can remove it from studio_albums
 
-# this is huge actually: "ended	| a boolean flag (true/false) indicating whether or not the artist has ended (is dissolved/deceased)" from the musicbrainz API, meaning
-# I can dynamically filter for artists that aren't going to be releasing any new music because they've been dissolved in a oil drum
-# nevermind, it doesn't look like they update it, searching for michael jackson shows "null" meaning either they know something I don't or it's not updated/used
+        - now that *I think* I'm capturing all of the necessary album data, I can look to finally add it to the database then make the function to actually compare
+          local albums to those found in the db cache
+
+        - way later down the line, I then need to make the many options, well, optional. That is the ignores for EPs, singles, compilations, lives and I will likely
+          add remixes to the cache. Then I would like to add the ability for users to define the score_floor value so they can fine tune it to their libary. 
+
+        - add a more precise rate limiting function so that I can really squeeze out that extra 100ms from the current time.sleep
+
+        - stretch goal for this branch is to add the ability to remap certain artist/mbid matchups. I don't think any of my current 300+ artists have had a mismatch
+          (aside from "F.U.N" because locally it's "FUN") where it either takes current albums from a given artist, searches to see if those albums belond to any of
+          the get_mbid artists and picks the right one, or present the user with a list of potential matches, and some of their studio albums to pick from, then update
+          the local record and wipes the record for that particular artist
+"""
 
 API_ROOT = "https://musicbrainz.org/ws/2"
 
@@ -56,19 +66,101 @@ def fetch_artist_mbid(a_name) -> CachedArtist: # i kinda hated function annotati
         else: 
             ended = False
 
-        artist_mbid = data["artists"][0]["id"] 
+        a_mbid = data["artists"][0]["id"]
+
+        try:
+            a_locale = data["artists"][0]["country"]
+        except KeyError as e:
+            a_locale = "XW"
+            logger.debug("Artist: %s, does not have a listed locale, using fallback 'XW' representing 'worldwide'", a_name)
 
     except IndexError as e: # for times when it doesn't return anything
         logger.error("IndexError %s when attempting to retrieve data on: %s", e, a_name)
 
     return CachedArtist(
-        artist_mbid = artist_mbid,
+        artist_mbid = a_mbid,
         artist_name = a_name,
+        artist_locale = a_locale,
         ended = ended
     )
 
-def fetch_artist_albums():
-    pass # going to work on local caching before implementing this
+def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
+    """ fetches and returns CachedArtist with appended albums """
+
+    query = (
+        f"arid:{artist.artist_mbid} (primarytype:album OR primarytype:single OR primarytype:ep) "
+        #"AND NOT secondarytype:live "
+        #"AND NOT secondarytype:compilation "
+        "AND NOT secondarytype:remix "
+        "AND NOT secondarytype:interview "
+        "AND NOT secondarytype:soundtrack "
+        "AND NOT secondarytype:demo "
+        "AND NOT secondarytype:mixtape/street"
+    )
+
+    limit = 100
+    offset = 0
+    score_floor = 88 # 88 still get *some* of the right albums, but < 88 has a bit too much noise, > 88 exlcudes many "best of" or "greatest hits" albums, need to
+    # try and see if the json data is not sequentially given in terms of the score, maybe a score 75 is listed above a 90 and so I break too soon to capture that
+    score_thresh = True
+
+    while score_thresh: # continue to increase offset until the current iteration of results is below the score threshold
+        payload = {
+            "query": query,
+            "fmt": "json",
+            "limit": limit,
+            "offset": offset
+        }
+
+        r = session.get(f"{API_ROOT}/release-group", headers=header, params=payload)
+        data = r.json()
+
+        for rg in data["release-groups"]:
+
+            if rg["score"] < score_floor:
+                score_thresh = False # if current score iteration is lower than the score floor, break this loop and exit while loop
+                break
+
+            title = rg["title"]
+            try:
+                release_year = rg["first-release-date"].split("-", 1)[0]
+            except KeyError as e:
+                continue # this was causing some weird behaviour, specifically for the band "american football", it would find an album "all of us" that doesn't exist
+            # when I pull the same data from the same url it'd be using, so instead skip instances of this. 
+
+            if rg["primary-type"].lower() != "album":
+                if rg["primary-type"].lower() == "single": # singles also include singles of tracks later released in an actual album, again, idrk if I can do someting
+                    # about that as some artists will release singles and NOT later release them as part of an album which is the use case I'm trying to capture
+                    artist.singles.append(f"{title} ({release_year})")
+
+                if rg["primary-type"].lower() == "ep": # some eps seem to be seen as studio albums from musicbrainz and idrk if I can do anything about that
+                    # and it seems to include "sessions" like aol and shit, will look into if I can set a param to ignore them
+                    artist.eps.append(f"{title} ({release_year})")
+                
+                continue
+
+            try:
+                for st in rg["secondary-types"]:
+                    if "live" in st.lower():
+                        artist.live_albums.append(f"{title} ({release_year})")
+                    if "compilation" in st.lower(): # TONS of noise on a low score level but then too high and it doesn't capture the actual needed stuff
+                        artist.compilations.append(f"{title} ({release_year})")
+
+            except KeyError: # if secondary-types doesn't exist then it has to be a studio album
+                artist.studio_albums.append(f"{title} ({release_year})")
+
+        count = data["count"] # if the count value indicating the amount of results isn't present, break after the first cycle as theres no pages to ination XD
+        if count is None:
+            break
+
+        offset += limit # if it finds only scores higher than score_floor and the offset exceeds the total count it can break
+        if offset >= count:
+            break
+
+        time.sleep(1.1)
+    
+    return artist
+
 
 def process_local_artists(upd_cfg: UpdaterConfig, artist_data: LocalArtist):
     """ decide based on local data what to do 
@@ -76,20 +168,32 @@ def process_local_artists(upd_cfg: UpdaterConfig, artist_data: LocalArtist):
         will get moved to a "pipeline" method when the modules get turned into classes
     """
 
+    to_add = []
+
     db = Database()
     
     for artist in artist_data:
         a = db.is_exists(artist.artist_name) # returns a CachedArtist object containing all the current DB data
         if a is None: # if not in DB
+            time.sleep(1.1)
+
             a = fetch_artist_mbid(artist.artist_name)
+            logger.info("%s", a)
+
             time.sleep(1.1) # RATE LIMIT I DONT WANNA GET IP BANNED BY LIKE THE ONLY 99.9% RELIABLE SOURCE FOR THIS DATA
-            print(a)
+
+            b = fetch_artist_albums(a)
+            logger.error("%s: %s", b.artist_name, b.singles)
+
+            to_add.append(b)
+
             # b = fetch_artist_albums(a)
             # call fetch_albums here, get the albums from musicbrainz, split according to their release group then I get back a fully completed "CachedArtist"
             # at which point I can call db.add(b) to add it into the database. 
         
-        if int(time.time()) - a.last_checked > one_week_unix_time: 
-            pass # check if the current artist is outdated, if it is, call fetch_artist_album and pass in a (the retrieved artist record) and overwrite the existing
+        #if int(time.time()) - a.last_checked > one_week_unix_time: 
+            #pass # check if the current artist is outdated, if it is, call fetch_artist_album and pass in a (the retrieved artist record) and overwrite the existing
+            
             # record doing db.add(b)
 
             # once all records have been updated (calling is_stale()) likely just on request, though I feel it'll happen anyway so I don't really know the best way
@@ -97,8 +201,6 @@ def process_local_artists(upd_cfg: UpdaterConfig, artist_data: LocalArtist):
 
             # then in each "if" I can make a search_mbid method in db.py using the mbid to retrieve the now updated records, compare and contrast to those locally
             # and output the missing/newest albums. Will need to isolate both updating records and doing the comparison
-        
-        fetch_artist_albums()
 
     #outdated = db.is_stale()
     
@@ -110,4 +212,7 @@ def process_local_artists(upd_cfg: UpdaterConfig, artist_data: LocalArtist):
         - musicbrainz api docs:     https://musicbrainz.org/doc/MusicBrainz_API/Search
             - it's so sad that "ended" isn't actually updated, it would've been so useful :(
             - WAIT holy shit, ended is updated 
+        - musicbrianz pagination:   https://community.metabrainz.org/t/api-browse-and-paging/814161
+        - musicbrainz lucene query: https://community.metabrainz.org/t/how-do-i-get-just-the-studio-albums-from-an-artist/461554/7
+        - lots of staring at:       https://musicbrainz.org/ws/2/release-group?query=arid:4ebb5ad3-9018-407d-8c24-c03011ab9ac6%20primarytype:album%20NOT%20secondarytype:live%20NOT%20secondarytype:compilation%20NOT%20secondarytype:remix%20NOT%20secondarytype:interview%20NOT%20secondarytype:soundtrack&fmt=json
 """
