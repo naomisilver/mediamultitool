@@ -47,9 +47,11 @@ class Database:
                   artist_locale text NOT NULL,
                   ended integer NOT NULL,
                   last_checked integer NOT NULL,
-                  singles text,
                   studio_albums text,
-                  eps text
+                  eps text,
+                  singles text,
+                  compilations text,
+                  live_albums text
                   )""")
         
         # mbid will be the primary key because it is wholey unique, annoyingly, I can't using it to search the db initially because that is the first thing I need from musicbrainz, I *could*
@@ -86,9 +88,11 @@ class Database:
             artist_locale = row[2],
             ended = row[3],
             last_checked = row[4],
-            singles = json.loads(row[5]),
-            studio_albums = json.loads(row[6]),
-            eps =  json.loads(row[7])
+            studio_albums = json.loads(row[5]),
+            eps =  json.loads(row[6]),
+            singles = json.loads(row[7]),
+            compilations = json.loads(row[8]),
+            live_albums = json.loads(row[9])
         )
         
     def is_stale(self) -> list[CachedArtist]:
@@ -117,15 +121,19 @@ class Database:
                 artist_locale = row[2],
                 ended = row[3],
                 last_checked = row[4],
-                singles = json.loads(row[5]),
-                studio_albums = json.loads(row[6]),
-                eps =  json.loads(row[7])
+                studio_albums = json.loads(row[5]),
+                eps =  json.loads(row[6]),
+                singles = json.loads(row[7]),
+                compilations = json.loads(row[8]),
+                live_albums = json.loads(row[9])
             ))
 
         return outdated
 
     def add(self, artist: CachedArtist):
         """ adds new artist into db """
+
+        t = int(time.time())
 
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
@@ -138,29 +146,36 @@ class Database:
                     ended,
                     last_checked,
                     studio_albums,
+                    eps,
                     singles,
-                    eps
+                    compilations,
+                    live_albums
                   )
-                  VALUES (?,?,?,?,?,?,?)
+                  VALUES (?,?,?,?,?,?,?,?,?,?)
                   ON CONFLICT (artist_mbid)
-                  DO UPDATE SET
+                  DO Update SET
                     artist_name = excluded.artist_name,
+                    artist_locale = excluded.artist_locale,
                     ended = excluded.ended,
                     last_checked = excluded.last_checked,
                     studio_albums = excluded.studio_albums,
+                    eps = excluded.eps,
                     singles = excluded.singles,
-                    eps = excluded.eps
+                    compilations = excluded.compilations,
+                    live_albums = excluded.live_albums
                  """,
                     (
                     artist.artist_mbid,
                     artist.artist_name,
                     artist.artist_locale,
                     int(artist.ended),
-                    artist.last_checked,
+                    t,
                     json.dumps(artist.studio_albums),
-                    json.dumps(artist.singles), # i KNOW this is really not best practice for storing multiple discrete items into a single record in a relational database, but
-                    json.dumps(artist.eps), # I'm not needing to check each of the albums induvidually, I would only ever consume the entire list of albums at one time, comparing all to all
-                    )) # then on retrieval I just do json.loads(thing)
+                    json.dumps(artist.eps),
+                    json.dumps(artist.singles),
+                    json.dumps(artist.compilations),
+                    json.dumps(artist.live_albums),
+                    ))
         
         conn.commit()
 

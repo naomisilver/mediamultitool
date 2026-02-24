@@ -1,5 +1,7 @@
 from ..models import LocalArtist, UpdaterConfig
+
 from .get_albums import process_local_artists
+from ..core.normalise import normalise
 
 from pathlib import Path
 import logging
@@ -101,9 +103,9 @@ def get_newest_album(upd_cfg: UpdaterConfig) -> LocalArtist:
 
         artist_data.append(LocalArtist(
             artist_name = artist_name,
-            latest_album = f"{normalise_album(album)} ({regex_tag_check(album)})", # before adding to the Artist object, I could really do with normalising/generalising it similar to playlist, though I really don't feel like
+            latest_album = f"{normalise(normalise_album(album))} ({regex_tag_check(album)})", # before adding to the Artist object, I could really do with normalising/generalising it similar to playlist, though I really don't feel like
             # mirroring the same logic so will look at how I could handle it using regex. 
-            all_albums = [f"{normalise_album(album)} ({regex_tag_check(album)})" for album in all_albums] # god I love list comprehension
+            all_albums = [f"{normalise(normalise_album(album))} ({regex_tag_check(album)})" for album in all_albums] # god I love list comprehension
         )) # in my test script, I retained the release year in the as it should help to give another way to match data later
 
     process_local_artists(upd_cfg, artist_data)

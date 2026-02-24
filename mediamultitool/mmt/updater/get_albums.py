@@ -1,6 +1,8 @@
 from ..models import LocalArtist, CachedArtist, UpdaterConfig
 from ..core.db import Database
 
+from ..core.normalise import normalise # it was between copy the same code for this module or just "commonise" it 
+
 import requests
 import logging
 import time
@@ -36,6 +38,8 @@ one_minute_unix_time = 60
 one_hour_unix_time = 3600
 one_day_unix_time = 86400 # somewhat temporary while testing
 one_week_unix_time = 604800
+one_month_unix_time = 2629743
+one_year_unix_time = 31556926
 
 session = requests.session()
 logger = logging.getLogger(__name__)
@@ -87,24 +91,34 @@ def fetch_artist_mbid(a_name) -> CachedArtist: # i kinda hated function annotati
 def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
     """ fetches and returns CachedArtist with appended albums """
 
+    artist.studio_albums = []
+    artist.eps = []
+    artist.singles = [] # no longer appending to an existing list of existing albums and causing duplicates
+    artist.compilations = []
+    artist.live_albums = []
+
     query = (
-        f"arid:{artist.artist_mbid} (primarytype:album OR primarytype:single OR primarytype:ep) "
+        f"arid:{artist.artist_mbid} AND primarytype:(album OR single OR ep) "
         #"AND NOT secondarytype:live "
         #"AND NOT secondarytype:compilation "
         "AND NOT secondarytype:remix "
         "AND NOT secondarytype:interview "
         "AND NOT secondarytype:soundtrack "
         "AND NOT secondarytype:demo "
-        "AND NOT secondarytype:mixtape/street"
+        "AND NOT secondarytype:mixtape/street "
+        #"AND NOT status:bootleg "
     )
 
     limit = 100
     offset = 0
-    score_floor = 88 # 88 still get *some* of the right albums, but < 88 has a bit too much noise, > 88 exlcudes many "best of" or "greatest hits" albums, need to
+    score_floor = 85 # 88 still get *some* of the right albums, but < 88 has a bit too much noise, > 88 exlcudes many "best of" or "greatest hits" albums, need to
     # try and see if the json data is not sequentially given in terms of the score, maybe a score 75 is listed above a 90 and so I break too soon to capture that
     score_thresh = True
 
     while score_thresh: # continue to increase offset until the current iteration of results is below the score threshold
+
+        time.sleep(1.1)
+
         payload = {
             "query": query,
             "fmt": "json",
@@ -131,23 +145,23 @@ def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
             if rg["primary-type"].lower() != "album":
                 if rg["primary-type"].lower() == "single": # singles also include singles of tracks later released in an actual album, again, idrk if I can do someting
                     # about that as some artists will release singles and NOT later release them as part of an album which is the use case I'm trying to capture
-                    artist.singles.append(f"{title} ({release_year})")
+                    artist.singles.append(f"{normalise(title)} ({release_year})")
 
                 if rg["primary-type"].lower() == "ep": # some eps seem to be seen as studio albums from musicbrainz and idrk if I can do anything about that
                     # and it seems to include "sessions" like aol and shit, will look into if I can set a param to ignore them
-                    artist.eps.append(f"{title} ({release_year})")
+                    artist.eps.append(f"{normalise(title)} ({release_year})")
                 
                 continue
 
             try:
                 for st in rg["secondary-types"]:
                     if "live" in st.lower():
-                        artist.live_albums.append(f"{title} ({release_year})")
-                    if "compilation" in st.lower(): # TONS of noise on a low score level but then too high and it doesn't capture the actual needed stuff
-                        artist.compilations.append(f"{title} ({release_year})")
+                        artist.live_albums.append(f"{normalise(title)} ({release_year})")
+                    if "compilation" in st.lower():
+                        artist.compilations.append(f"{normalise(title)} ({release_year})")
 
             except KeyError: # if secondary-types doesn't exist then it has to be a studio album
-                artist.studio_albums.append(f"{title} ({release_year})")
+                artist.studio_albums.append(f"{normalise(title)} ({release_year})")
 
         count = data["count"] # if the count value indicating the amount of results isn't present, break after the first cycle as theres no pages to ination XD
         if count is None:
@@ -157,62 +171,67 @@ def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
         if offset >= count:
             break
 
-        time.sleep(1.1)
+        #time.sleep(1.1)
     
     return artist
 
 
-def process_local_artists(upd_cfg: UpdaterConfig, artist_data: LocalArtist):
+def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist):
     """ decide based on local data what to do 
     
         will get moved to a "pipeline" method when the modules get turned into classes
     """
 
-    to_add = []
+    t = int(time.time())
 
     db = Database()
     
-    for artist in artist_data:
-        a = db.is_exists(artist.artist_name) # returns a CachedArtist object containing all the current DB data
+    for local_artist in local_artist_data: # add new if it doesn't exist
+        a = db.is_exists(local_artist.artist_name) # returns a CachedArtist object containing all the current DB data 
         if a is None: # if not in DB
             time.sleep(1.1)
 
-            a = fetch_artist_mbid(artist.artist_name)
+            a = fetch_artist_mbid(local_artist.artist_name)
             logger.info("%s", a)
 
             time.sleep(1.1) # RATE LIMIT I DONT WANNA GET IP BANNED BY LIKE THE ONLY 99.9% RELIABLE SOURCE FOR THIS DATA
 
             b = fetch_artist_albums(a)
-            logger.error("%s: %s", b.artist_name, b.singles)
+            logger.error("%s: %s", b.artist_name, b.studio_albums)
 
-            to_add.append(b)
+            db.add(b)
 
-            # b = fetch_artist_albums(a)
-            # call fetch_albums here, get the albums from musicbrainz, split according to their release group then I get back a fully completed "CachedArtist"
-            # at which point I can call db.add(b) to add it into the database. 
-        
-        #if int(time.time()) - a.last_checked > one_week_unix_time: 
-            #pass # check if the current artist is outdated, if it is, call fetch_artist_album and pass in a (the retrieved artist record) and overwrite the existing
-            
-            # record doing db.add(b)
+    stale_artists = db.is_stale()
+    for stale_a in stale_artists:
+        if stale_a.ended is True and t - stale_a.last_checked < one_year_unix_time: # if ended & last checked less than a year ago
+            logger.debug("Skipping artist %s, ended and last checked < a year ago")
+            continue
 
-            # once all records have been updated (calling is_stale()) likely just on request, though I feel it'll happen anyway so I don't really know the best way
-            # forward, but I do need some sleep 
+        if stale_a.ended is not True and t - stale_a.last_checked < one_minute_unix_time: # if not & last checked less than a week ago 
+            logger.debug("Skipping artist %s, last checked < a week ago")
+            continue
 
-            # then in each "if" I can make a search_mbid method in db.py using the mbid to retrieve the now updated records, compare and contrast to those locally
-            # and output the missing/newest albums. Will need to isolate both updating records and doing the comparison
+        updated_a = fetch_artist_albums(stale_a)
 
-    #outdated = db.is_stale()
-    
-    #for o in outdated:
-        #to_process.append(o)
+        logger.info("Updated artist: %s", updated_a.studio_albums)
+
+        db.add(updated_a)
+
+    for local_artist in local_artist_data:
+        db_artist = db.is_exists(local_artist.artist_name)
+
+        temp3 = [x for x in db_artist.studio_albums if x not in local_artist.all_albums]
+
+        logger.warning("Missing albums for artist %s are: %s", local_artist.artist_name, temp3)
+
 
 """
     Sources/credit:
-        - musicbrainz api docs:     https://musicbrainz.org/doc/MusicBrainz_API/Search
+        - musicbrainz api docs:             https://musicbrainz.org/doc/MusicBrainz_API/Search
             - it's so sad that "ended" isn't actually updated, it would've been so useful :(
             - WAIT holy shit, ended is updated 
-        - musicbrianz pagination:   https://community.metabrainz.org/t/api-browse-and-paging/814161
-        - musicbrainz lucene query: https://community.metabrainz.org/t/how-do-i-get-just-the-studio-albums-from-an-artist/461554/7
-        - lots of staring at:       https://musicbrainz.org/ws/2/release-group?query=arid:4ebb5ad3-9018-407d-8c24-c03011ab9ac6%20primarytype:album%20NOT%20secondarytype:live%20NOT%20secondarytype:compilation%20NOT%20secondarytype:remix%20NOT%20secondarytype:interview%20NOT%20secondarytype:soundtrack&fmt=json
+        - musicbrianz pagination:           https://community.metabrainz.org/t/api-browse-and-paging/814161
+        - musicbrainz lucene query:         https://community.metabrainz.org/t/how-do-i-get-just-the-studio-albums-from-an-artist/461554/7
+        - lots of staring at:               https://musicbrainz.org/ws/2/release-group?query=arid:4ebb5ad3-9018-407d-8c24-c03011ab9ac6%20primarytype:album%20NOT%20secondarytype:live%20NOT%20secondarytype:compilation%20NOT%20secondarytype:remix%20NOT%20secondarytype:interview%20NOT%20secondarytype:soundtrack&fmt=json
+        - compare 2 lists, output missing   https://stackoverflow.com/questions/78488469/sqlite-insert-or-replace-and-on-conflict-do-nothing     
 """
