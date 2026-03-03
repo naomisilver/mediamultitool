@@ -39,6 +39,11 @@ class PlaylistConfig:
 @dataclass(slots=True)
 class UpdaterConfig: # small now but will make things easier if I do move to automatic downloading via streamrip
     local_music_path: Path
+    ignore_studio_albums: bool
+    ignore_eps: bool
+    ignore_singles: bool
+    ignore_compilations: bool
+    ignore_live_albums: bool
 
 """
     Sources/credit:

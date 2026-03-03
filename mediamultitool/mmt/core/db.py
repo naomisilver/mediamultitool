@@ -75,7 +75,7 @@ class Database:
 
         row = c.fetchone()
 
-        logger.debug("Searched DB for: %s")
+        logger.debug("Searched DB for: %s", artist_name)
 
         conn.close()
 

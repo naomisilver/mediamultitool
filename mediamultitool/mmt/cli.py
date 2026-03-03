@@ -56,10 +56,10 @@ def validate_input(parser, args, cfg, APP_DIR): # there HAS to be a better way h
                 else:
                     parser.error("default output in the configuration file is not valid, please change, -c/--c to open config file")
 
-            if cfg.playlist.local_storage_path == "": # if a known required value isn't given, will rely on something else to get user to fill out config when other features are added
+            if cfg.core.local_storage_path == "": # if a known required value isn't given, will rely on something else to get user to fill out config when other features are added
                 parser.error("-p/-playlist operation requires a path to local music files, -c/--config to open config file")
             else:
-                if Path(cfg.playlist.local_storage_path).is_dir():
+                if Path(cfg.core.local_storage_path).is_dir():
                     pass
                 else:
                     parser.error("path to local storage is not quite right, please ensure this is correct")
@@ -140,7 +140,9 @@ def mmt():
 
     # updater subparsing
     updater_parser = subparsers.add_parser("updater", parents=[common_parser]) # moving away from the single letter commands
-    cleaner_parser.set_defaults(command="updater")
+    #updater_parser.add_argument("search_artist" , nargs="*", help="induvidual artist names to search for")
+    updater_parser.set_defaults(command="updater")
+    
 
     args = parser.parse_args()
 

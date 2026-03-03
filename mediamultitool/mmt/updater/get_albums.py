@@ -1,29 +1,16 @@
 from ..models import LocalArtist, CachedArtist, UpdaterConfig
+
 from ..core.db import Database
 
 from ..core.normalise import normalise # it was between copy the same code for this module or just "commonise" it 
 
+from ratelimit import limits, sleep_and_retry
 import requests
 import logging
 import time
 
 """
     - TODO:
-        - Implement something to scroll another page even after the "score_thresh" flag is triggered to see if that can help capture any missed releases and allowing
-          me to increase the score_floor to weed out some of the noise
-
-        - see if there's anything I can do to exlcude track single releases that later end up in an album so that only the unique singles stick (i fear I won't be able
-          to do much as I don't think that information will be exposed by musicbrainz)
-
-        - some EPs are shown to be a studio album release AND an ep so my current setup capture both and place them both in, not necessarily a massive issue but I need
-          to see how prolific it is, if there's nothing I can do in the fetch_album func, I should be able to check if it's in EP then I can remove it from studio_albums
-
-        - now that *I think* I'm capturing all of the necessary album data, I can look to finally add it to the database then make the function to actually compare
-          local albums to those found in the db cache
-
-        - way later down the line, I then need to make the many options, well, optional. That is the ignores for EPs, singles, compilations, lives and I will likely
-          add remixes to the cache. Then I would like to add the ability for users to define the score_floor value so they can fine tune it to their libary. 
-
         - add a more precise rate limiting function so that I can really squeeze out that extra 100ms from the current time.sleep
 
         - stretch goal for this branch is to add the ability to remap certain artist/mbid matchups. I don't think any of my current 300+ artists have had a mismatch
@@ -34,12 +21,8 @@ import time
 
 API_ROOT = "https://musicbrainz.org/ws/2"
 
-one_minute_unix_time = 60
-one_hour_unix_time = 3600
-one_day_unix_time = 86400 # somewhat temporary while testing
-one_week_unix_time = 604800
-one_month_unix_time = 2629743
-one_year_unix_time = 31556926
+CALLS = 1 # 1 call per period
+PERIOD = 1.01 # 1.01 seconds
 
 session = requests.session()
 logger = logging.getLogger(__name__)
@@ -48,14 +31,32 @@ header = {
     'user-agent': 'mediamultitool (by naomisilver2002@gmail.com)' # mb's big thing is be good to the source so I'm trying to be :D
 }
 
+@sleep_and_retry # this is awesome found from the stackoverflow link in refs
+@limits(calls=CALLS, period=PERIOD) # was going to be an import script but couldn't get it working, ratelimiting each function didn't work because
+# i while loop when getting albums so rate limiting a seperate helper function was the next best choice
+def mb_get(path, params) -> requests.Response:
+    """ rate limited get for musicbrainz """
+    url = f"{API_ROOT}{path}"
+    r = session.get(url, headers=header, params=params)
+
+    if r.status_code != 200:
+        logger.warning("Musicbrainz request failed: %s %s -> %s; body=%r", path, params, r.status_code, r.text[:100])
+
+        r.raise_for_status()
+
+    return r
+
 def fetch_artist_mbid(a_name) -> CachedArtist: # i kinda hated function annotations because clutter but now I'm working across multiple files with multiple functions it's quite nice
     """ fetches artist mbid of a provided local artist """
+
+    #check_limit() # the stackoverflow link credited in mb_ratelimit.py is genius and is/is going to be incredibly useful 
 
     payload = {
         'query': a_name, # fuzzy search
         'fmt': 'json'
     }
-    r = session.get(f"{API_ROOT}/artist", headers=header, params=payload)
+    r = mb_get("/artist", payload)
+    # r = session.get(f"{API_ROOT}/artist", headers=header, params=payload)
     logger.debug(r.status_code) # for something so heavily rate limited it is very handy knowing this
     data = r.json()
 
@@ -117,8 +118,6 @@ def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
 
     while score_thresh: # continue to increase offset until the current iteration of results is below the score threshold
 
-        time.sleep(1.1)
-
         payload = {
             "query": query,
             "fmt": "json",
@@ -126,7 +125,8 @@ def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
             "offset": offset
         }
 
-        r = session.get(f"{API_ROOT}/release-group", headers=header, params=payload)
+        r = mb_get("/release-group", payload)
+        # r = session.get(f"{API_ROOT}/release-group", headers=header, params=payload)
         data = r.json()
 
         for rg in data["release-groups"]:
@@ -170,60 +170,8 @@ def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
         offset += limit # if it finds only scores higher than score_floor and the offset exceeds the total count it can break
         if offset >= count:
             break
-
-        #time.sleep(1.1)
     
-    return artist
-
-
-def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist):
-    """ decide based on local data what to do 
-    
-        will get moved to a "pipeline" method when the modules get turned into classes
-    """
-
-    t = int(time.time())
-
-    db = Database()
-    
-    for local_artist in local_artist_data: # add new if it doesn't exist
-        a = db.is_exists(local_artist.artist_name) # returns a CachedArtist object containing all the current DB data 
-        if a is None: # if not in DB
-            time.sleep(1.1)
-
-            a = fetch_artist_mbid(local_artist.artist_name)
-            logger.info("%s", a)
-
-            time.sleep(1.1) # RATE LIMIT I DONT WANNA GET IP BANNED BY LIKE THE ONLY 99.9% RELIABLE SOURCE FOR THIS DATA
-
-            b = fetch_artist_albums(a)
-            logger.error("%s: %s", b.artist_name, b.studio_albums)
-
-            db.add(b)
-
-    stale_artists = db.is_stale()
-    for stale_a in stale_artists:
-        if stale_a.ended is True and t - stale_a.last_checked < one_year_unix_time: # if ended & last checked less than a year ago
-            logger.debug("Skipping artist %s, ended and last checked < a year ago")
-            continue
-
-        if stale_a.ended is not True and t - stale_a.last_checked < one_minute_unix_time: # if not & last checked less than a week ago 
-            logger.debug("Skipping artist %s, last checked < a week ago")
-            continue
-
-        updated_a = fetch_artist_albums(stale_a)
-
-        logger.info("Updated artist: %s", updated_a.studio_albums)
-
-        db.add(updated_a)
-
-    for local_artist in local_artist_data:
-        db_artist = db.is_exists(local_artist.artist_name)
-
-        temp3 = [x for x in db_artist.studio_albums if x not in local_artist.all_albums]
-
-        logger.warning("Missing albums for artist %s are: %s", local_artist.artist_name, temp3)
-
+    return artist      
 
 """
     Sources/credit:
@@ -232,6 +180,7 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
             - WAIT holy shit, ended is updated 
         - musicbrianz pagination:           https://community.metabrainz.org/t/api-browse-and-paging/814161
         - musicbrainz lucene query:         https://community.metabrainz.org/t/how-do-i-get-just-the-studio-albums-from-an-artist/461554/7
-        - lots of staring at:               https://musicbrainz.org/ws/2/release-group?query=arid:4ebb5ad3-9018-407d-8c24-c03011ab9ac6%20primarytype:album%20NOT%20secondarytype:live%20NOT%20secondarytype:compilation%20NOT%20secondarytype:remix%20NOT%20secondarytype:interview%20NOT%20secondarytype:soundtrack&fmt=json
-        - compare 2 lists, output missing   https://stackoverflow.com/questions/78488469/sqlite-insert-or-replace-and-on-conflict-do-nothing     
+        - lots of staring at:               https://musicbrainz.org/ws/2/release-group?query=arid:4ebb5ad3-9018-407d-8c24-c03011ab9ac6%20primarytype:album%20NOT%20secondarytype:live%20NOT%20secondarytype:compilation%20NOT%20secondarytype:remix%20NOT%20secondarytype:interview%20NOT%20secondarytype:soundtrack&fmt=json    
+        - ratelimit:                        https://stackoverflow.com/questions/40748687/python-api-rate-limiting-how-to-limit-api-calls-globally
+                                            https://pypi.org/project/ratelimit/
 """
