@@ -68,13 +68,22 @@ def run(args, cfg):
         run_cleaner(dl_path)
 
     if args.command == "updater":
+
+        #temp = True if cfg.updater.new.lower() == "new" else False # trying to learn ternary operators the same way I learned list comp and gen expr
+        # the above feels the most readable as a newbie but this also works
+        #temp = cfg.updater.new.lower() == "new" # where as this seems like a nightmare to get my head around
+        # my take is that because cfg.updater.new.lower() is either "new" or it's not, it returns a bool and if it is, then great,
+
         updater_cfg = UpdaterConfig(
             local_music_path = Path(cfg.core.local_music_path), # will be moved into a "general" table in the config file
-            ignore_studio_albums = cfg.updater.ignore_studio_albums,
-            ignore_eps = cfg.updater.ignore_eps,
-            ignore_singles = cfg.updater.ignore_singles,
-            ignore_compilations = cfg.updater.ignore_compilations,
-            ignore_live_albums = cfg.updater.ignore_live_albums
+            all_or_new = True if cfg.updater.check_new_or_all.lower() == "all" else False, # had it inverse but I'd prefer it defaults to new if it isn't explcitly "all"
+            ignore = {
+                "studio_albums": cfg.updater.ignore_studio_albums,
+                "eps": cfg.updater.ignore_eps,
+                "singles": cfg.updater.ignore_singles,
+                "compilations": cfg.updater.ignore_compilations,
+                "live_albums": cfg.updater.ignore_live_albums,
+            }
         )
         get_newest_album(updater_cfg)
 
@@ -82,5 +91,8 @@ def run(args, cfg):
 
 """
     Sources/credit:
-        - Time keeping: https://stackoverflow.com/questions/1557571/how-do-i-get-time-of-a-python-programs-execution (not necessary, just thought it'd be cool) 
+        - Time keeping:         https://stackoverflow.com/questions/1557571/how-do-i-get-time-of-a-python-programs-execution (not necessary, just thought it'd be cool) 
+        - Ternary operators:    https://www.geeksforgeeks.org/python/ternary-operator-in-python/ 
+                                https://book.pythontips.com/en/latest/ternary_operators.html
+
 """

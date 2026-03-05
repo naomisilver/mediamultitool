@@ -105,6 +105,25 @@ def get_newest_album(upd_cfg: UpdaterConfig) -> LocalArtist:
 
     process_local_artists(upd_cfg, artist_data)
 
+def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalArtist) -> list:
+    #list(albums) # if newest album gets passed just ensure it is a list
+    
+    if upd_cfg.all_or_new: # if it is "all"/"ALL" ONLY then treat all all
+        missing = [x for x in db_items if x not in local_artist.all_albums]
+        return missing
+    
+    else: # treat everything else as only checking new 
+        missing = []
+
+        local_year = regex_tag_check(local_artist.latest_album)
+        for i in db_items:
+            db_year = regex_tag_check(i)
+
+            if db_year > local_year:
+                missing.append(i)
+
+        return missing
+
 def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist):
     """ decide based on local data what to do 
     
@@ -149,35 +168,17 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
     for local_artist in local_artist_data:
         db_artist = db.is_exists(local_artist.artist_name)
 
-        # not permanent, for testing purposes. Need to decide whether I want to retain induvidual lists for each of the missing albums types, or append each
-        # induvidual list to a MEGA list of all missing albums which could then be passed to the a downloading function. Both would achieve the same result
+        for album_type, ignore in upd_cfg.ignore.items():
+            if ignore:
+                continue
 
-        # also need to figure if I want to continue logging, in full, the missing albums or if I output to a file as the default options and
-        # truncating the log output when no option is given, then not truncating when outputting to the console
-        if not upd_cfg.ignore_studio_albums:
-            m_studio = [x for x in db_artist.studio_albums if x not in local_artist.all_albums]
-            if m_studio:
-                logger.warning("Missing studio albums for artist %s are: %s", local_artist.artist_name, m_studio)
+            db_items = getattr(db_artist, album_type)
+            
+            missing = compare_albums(upd_cfg, db_items, local_artist) # not perfect, need to dive deeper, though, slay the spire 2 came out 4 minutes ago
+            if not missing: # and I NEEED to jump on that :)
+                continue
 
-        if not upd_cfg.ignore_eps:
-            m_eps = [x for x in db_artist.eps if x not in local_artist.all_albums]
-            if m_eps:
-                logger.warning("Missing EPs for artist %s are: %s", local_artist.artist_name, m_eps)
-
-        if not upd_cfg.ignore_singles:
-            m_singles = [x for x in db_artist.singles if x not in local_artist.all_albums]
-            if m_singles:
-                logger.warning("Missing singles for artist %s are: %s", local_artist.artist_name, m_singles)
-
-        if not upd_cfg.ignore_live_albums:
-            m_live = [x for x in db_artist.live_albums if x not in local_artist.all_albums]
-            if m_live:
-                logger.warning("Missing live albums for artist %s are: %s", local_artist.artist_name, m_live)
-
-        if not upd_cfg.ignore_compilations:
-            m_compilations = [x for x in db_artist.compilations if x not in local_artist.all_albums]
-            if m_compilations:
-                logger.warning("Missing compilations for artist %s are: %s", local_artist.artist_name, m_compilations) 
+            logger.warning("Missing albums for artist %s: %s", local_artist.artist_name, missing)
 
 """
     Sources/credit:

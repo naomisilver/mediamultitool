@@ -46,6 +46,7 @@ class UpdaterConfig:
     ignore_singles: bool = False
     ignore_compilations: bool = False
     ignore_live_albums: bool = False
+    check_new_or_all: str = ''
 
 @dataclass(slots=True)
 class Misc:

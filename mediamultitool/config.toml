@@ -47,6 +47,13 @@ ignore_singles = true
 ignore_compilations = true
 ignore_live_albums = true
 
+# below is a way you can "set it and forget it", it accept either 'new' or 'all' where new will only show you
+# albums newer than newest one you have locally, and all will show you every album you're missing from an artist's
+# discography (please bare in mind, for massive collections and/or with many non-ignored album types, there will
+# be ALOT of information for you to sift through) (if no input is given on the command line, or here, it will default
+# to only showing new)
+check_new_or_all = ''
+
 [app.misc]
 # versioning DO NOT CHANGE
 version = '0.1.4'

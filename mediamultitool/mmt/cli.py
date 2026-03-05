@@ -79,6 +79,10 @@ def validate_input(parser, args, cfg, APP_DIR): # there HAS to be a better way h
                     parser.error("Directories require the -r/-recursive flag")
                 pass
 
+        if args.command == "updater":
+            if args.new and args.all:
+                parser.error("Both -new and -all are mutually exclusive, please pick one :)")
+
     except AttributeError:
         pass
 
@@ -129,18 +133,20 @@ def mmt():
     subparsers = parser.add_subparsers(dest="command", title="subcommands")
 
     # playlist subparsing
-    playlist_parser = subparsers.add_parser("playlist", aliases=["p"], parents=[common_parser])
+    playlist_parser = subparsers.add_parser("playlist", parents=[common_parser])
     playlist_parser.add_argument("input_param", nargs="+", type=str, help="Input Parameter (link to playlist or path to csv file)") # moving away from either single csv or dir of csv in
     playlist_parser.add_argument("-o", "--output", dest="output_dir", type=Path, help="Output directory") # favour of multiple inputs, with an optional output flag
     playlist_parser.set_defaults(command="playlist") 
 
     # cleaner subparsing
-    cleaner_parser = subparsers.add_parser("cleaner", aliases=["c"], parents=[common_parser])
+    cleaner_parser = subparsers.add_parser("cleaner", parents=[common_parser])
     cleaner_parser.set_defaults(command="cleaner")
 
     # updater subparsing
     updater_parser = subparsers.add_parser("updater", parents=[common_parser]) # moving away from the single letter commands
     #updater_parser.add_argument("search_artist" , nargs="*", help="induvidual artist names to search for")
+    updater_parser.add_argument("-new", action="store_true", help="only compare against newer albums than is in your collection")
+    updater_parser.add_argument("-all", action="store_true", help="compare against all albums in your collection")
     updater_parser.set_defaults(command="updater")
     
 

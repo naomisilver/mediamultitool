@@ -39,11 +39,8 @@ class PlaylistConfig:
 @dataclass(slots=True)
 class UpdaterConfig: # small now but will make things easier if I do move to automatic downloading via streamrip
     local_music_path: Path
-    ignore_studio_albums: bool
-    ignore_eps: bool
-    ignore_singles: bool
-    ignore_compilations: bool
-    ignore_live_albums: bool
+    all_or_new: bool
+    ignore: dict[str, bool] = field(default_factory=dict) # store the ignores in a dictionary so I can iterate over it, no more big if block
 
 """
     Sources/credit:
