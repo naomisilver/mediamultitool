@@ -147,6 +147,7 @@ def mmt():
     #updater_parser.add_argument("search_artist" , nargs="*", help="induvidual artist names to search for")
     updater_parser.add_argument("-new", action="store_true", help="only compare against newer albums than is in your collection")
     updater_parser.add_argument("-all", action="store_true", help="compare against all albums in your collection")
+    updater_parser.add_argument("-u", "--update-cache", dest="update_cache", action="store_true", help="update the local cache")
     updater_parser.set_defaults(command="updater")
     
 

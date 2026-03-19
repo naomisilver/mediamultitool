@@ -6,9 +6,11 @@ from ..core.normalise import normalise
 from ..core.db import Database
 
 from pathlib import Path
+from platformdirs import user_config_dir
 import logging
 import re
 import time
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +34,17 @@ one_week_unix_time = 604800
 one_month_unix_time = 2629743
 one_year_unix_time = 31556926
 
+APP_NAME = "mediamultitool"
+APP_DIR = Path(user_config_dir(APP_NAME))
+LOG_DIR = APP_DIR / "logs" # copy pasted from cli.py with the added DB_PATH, will be moving to paths.py in a later issue/commit but needed to check for db existing
+LOG_PATH = APP_DIR / "logs" / "mmt.log"
+DB_PATH = APP_DIR / "updater.db"
+
 def regex_tag_check(s: str) -> int:
     """ helper to find the release year of a given album """
 
-    tags = re.findall("\([1-2][0-9][0-9][0-9]\)", s) # easy change to only accept numbers from 1000-2999 as apposed to 0000-9999
+    tags = re.findall(r'\([1-2][0-9][0-9][0-9]\)', s) # im assuming since moving to linux I'm using a newer python version (3.13.7 vs 3.11.9) this giving a syntax warning claiming
+    # "\(" wasn't a valid escape sequence, it still worked but printed the warning, using a raw string fixed that
 
     newest_tag = 0
 
@@ -70,7 +79,7 @@ def get_newest_album(upd_cfg: UpdaterConfig) -> LocalArtist:
     artist_data = []
 
     for artist in music_path.iterdir():
-        if artist.name.lower() == ("various artists", "playlist"):
+        if artist.name.lower() in ("various artists", "playlist"):
             print("hello")
             continue # don't want to be attempting to download tracks from various artists, that would 100% bite me in the ass if I did...
 
@@ -123,13 +132,9 @@ def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalAr
                 missing.append(i)
 
         return missing
-
-def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist):
-    """ decide based on local data what to do 
     
-        will get moved to a "pipeline" method when the modules get turned into classes
-    """
-
+def update_cache(local_artist_data: LocalArtist): # unsure whether I should include this here or move to a seperate file, will sleep on it
+    
     t = int(time.time())
 
     db = Database()
@@ -137,12 +142,9 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
     for local_artist in local_artist_data: # add new if it doesn't exist
         a = db.is_exists(local_artist.artist_name) # returns a CachedArtist object containing all the current DB data 
         if a is None: # if not in DB
-            #time.sleep(1.1)
 
             a = fetch_artist_mbid(local_artist.artist_name)
             logger.info("%s", a)
-
-            #time.sleep(1.1) # RATE LIMIT I DONT WANNA GET IP BANNED BY LIKE THE ONLY 99.9% RELIABLE SOURCE FOR THIS DATA
 
             b = fetch_artist_albums(a)
             logger.error("%s: %s", b.artist_name, b.studio_albums)
@@ -165,6 +167,25 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
 
         db.add(updated_a)
 
+def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist):
+    """ decide based on local data what to do 
+    
+        will get moved to a "pipeline" method when the modules get turned into classes
+    """
+    
+    if upd_cfg.update_cache:
+        update_cache(local_artist_data)
+    # i don't like doing this here, I'd prefer have this in main somehow but I don't think I can in a clean way. I may be able to do this cleaner and more obviously
+    # when I "class-ify" this module
+    elif os.path.isfile(DB_PATH):
+        pass
+
+    else:
+        logger.error("The local cache has not yet been created, please run 'mmt updater -update-cache to generate cache")
+        raise SystemExit
+
+    db = Database()
+
     for local_artist in local_artist_data:
         db_artist = db.is_exists(local_artist.artist_name)
 
@@ -178,7 +199,7 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
             if not missing: # and I NEEED to jump on that :)
                 continue
 
-            logger.warning("Missing albums for artist %s: %s", local_artist.artist_name, missing)
+            logger.warning("Missing %s for artist %s: %s", album_type, local_artist.artist_name, missing)
 
 """
     Sources/credit:

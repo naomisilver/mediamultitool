@@ -69,14 +69,34 @@ def run(args, cfg):
 
     if args.command == "updater":
 
-        #temp = True if cfg.updater.new.lower() == "new" else False # trying to learn ternary operators the same way I learned list comp and gen expr
-        # the above feels the most readable as a newbie but this also works
-        #temp = cfg.updater.new.lower() == "new" # where as this seems like a nightmare to get my head around
-        # my take is that because cfg.updater.new.lower() is either "new" or it's not, it returns a bool and if it is, then great,
+        #if args.all or args.new:
+            #if args.all:
+                #all_or_new = True
+            #elif args.new:
+                #all_or_new = False
+        
+        #elif cfg.updater.check_new_or_all:
+            #if cfg.updater.check_new_or_all.lower() == "all":
+                #all_or_new = True
+            #elif cfg.updater.check_new_or_all.lower() == "new":
+                #all_or_new = False
+
+        #else:
+            #all_or_new = False
+
+        all_or_new = ( # if given when invoking, use that, else use the config, else default to showing new
+            True if args.all 
+            else False if args.new # tried the above to get it to work but was ugly, I used ternary operator before and wondered if you could nest them, low and behold
+            else True if cfg.updater.check_new_or_all == "all" # you can :)
+            else False if cfg.updater.check_new_or_all == "new"
+            else False
+        )
 
         updater_cfg = UpdaterConfig(
-            local_music_path = Path(cfg.core.local_music_path), # will be moved into a "general" table in the config file
-            all_or_new = True if cfg.updater.check_new_or_all.lower() == "all" else False, # had it inverse but I'd prefer it defaults to new if it isn't explcitly "all"
+            local_music_path = Path(cfg.core.local_music_path),
+            update_cache = args.update_cache,
+            # all_or_new = True if cfg.updater.check_new_or_all.lower() == "all" else False, # had it inverse but I'd prefer it defaults to new if it isn't explcitly "all"
+            all_or_new = all_or_new,
             ignore = {
                 "studio_albums": cfg.updater.ignore_studio_albums,
                 "eps": cfg.updater.ignore_eps,
@@ -85,6 +105,7 @@ def run(args, cfg):
                 "live_albums": cfg.updater.ignore_live_albums,
             }
         )
+
         get_newest_album(updater_cfg)
 
     logger.info("Completed in: %s seconds", round(time.time() - start_time, 3))
@@ -94,5 +115,7 @@ def run(args, cfg):
         - Time keeping:         https://stackoverflow.com/questions/1557571/how-do-i-get-time-of-a-python-programs-execution (not necessary, just thought it'd be cool) 
         - Ternary operators:    https://www.geeksforgeeks.org/python/ternary-operator-in-python/ 
                                 https://book.pythontips.com/en/latest/ternary_operators.html
+        - nested ternary op    https://stackoverflow.com/questions/44636514/python-multiple-nested-ternary-expression
+            - the syntax I used was not used here and couldn't find much that specific syntax though most examples are single liners so tried line breaking and it worked so :shrug:
 
 """

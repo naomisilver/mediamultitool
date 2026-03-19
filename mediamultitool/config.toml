@@ -51,7 +51,7 @@ ignore_live_albums = true
 # albums newer than newest one you have locally, and all will show you every album you're missing from an artist's
 # discography (please bare in mind, for massive collections and/or with many non-ignored album types, there will
 # be ALOT of information for you to sift through) (if no input is given on the command line, or here, it will default
-# to only showing new)
+# to only showing new) this can be overridden by giving -new or -all when running updater
 check_new_or_all = ''
 
 [app.misc]
