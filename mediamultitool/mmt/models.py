@@ -15,16 +15,12 @@ class LocalArtist: # represents what was found locally
 
 @dataclass(slots=True)
 class CachedArtist: # represents what I got back from musicbrainz/what exists in the db cache
-    artist_mbid: str
-    artist_locale: str 
-    artist_name: str
+    artist_mbid: str = ''
+    artist_locale: str = ''
+    artist_name: str = ''
     ended: int = 0
     last_checked: int = 0 # using unix timestamp, take the current timestamp, subtract what is stored in db, if longer than 604,800 (a week) then update local cache
-    studio_albums: list[str] = field(default_factory=list)
-    singles: list[str] = field(default_factory=list)
-    eps: list[str] = field(default_factory=list)
-    live_albums: list[str] = field(default_factory=list)
-    compilations: list[str] = field(default_factory=list)
+    albums: list[dict] = field(default_factory=list)
 
 @dataclass(slots=True)
 class PlaylistConfig:

@@ -98,11 +98,11 @@ def run(args, cfg):
             # all_or_new = True if cfg.updater.check_new_or_all.lower() == "all" else False, # had it inverse but I'd prefer it defaults to new if it isn't explcitly "all"
             all_or_new = all_or_new,
             ignore = {
-                "studio_albums": cfg.updater.ignore_studio_albums,
-                "eps": cfg.updater.ignore_eps,
-                "singles": cfg.updater.ignore_singles,
-                "compilations": cfg.updater.ignore_compilations,
-                "live_albums": cfg.updater.ignore_live_albums,
+                "studio_album": cfg.updater.ignore_studio_albums,
+                "ep": cfg.updater.ignore_eps,
+                "single": cfg.updater.ignore_singles,
+                "compilation": cfg.updater.ignore_compilations,
+                "live_album": cfg.updater.ignore_live_albums,
             }
         )
 

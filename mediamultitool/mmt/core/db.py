@@ -26,7 +26,11 @@ DB_PATH = APP_DIR / "updater.db"
     TODO:
         - I really need to find a way to condense these methods, I'm repeating the same steps and espc for db.add(), docstrings as part of a callable should be illegal
 
-        - it's also currently not very polymorphic of me right me, but I want to get the rest of it working before  
+        - it's also currently not very polymorphic of me right me, but I want to get the rest of it working before
+
+        - check the schema added in https://github.com/naomisilver/mediamultitool/issues/10 for new schema. 
+            - on lookup for artist's albums (where the artist already exists and last checked is not less thna a week), I can DELETE from albums where artist_mbid matches then
+              reinsert, meaning existing cached items stay up to date and solves for issues where musicbrainz misrepresents an artists albums.
 """
 
 class Database:
@@ -41,19 +45,36 @@ class Database:
         """ create the database and table """
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
+        #c.execute("""CREATE TABLE artists (
+        #          artist_mbid text PRIMARY KEY,
+        #          artist_name text NOT NULL UNIQUE,
+        #          artist_locale text NOT NULL,
+        #          ended integer NOT NULL,
+        #          last_checked integer NOT NULL,
+        #          studio_albums text,
+        #          eps text,
+        #          singles text,
+        #          compilations text,
+        #          live_albums text
+        #          )""")
+        
         c.execute("""CREATE TABLE artists (
                   artist_mbid text PRIMARY KEY,
                   artist_name text NOT NULL UNIQUE,
                   artist_locale text NOT NULL,
                   ended integer NOT NULL,
-                  last_checked integer NOT NULL,
-                  studio_albums text,
-                  eps text,
-                  singles text,
-                  compilations text,
-                  live_albums text
+                  last_checked integer NOT NULL
                   )""")
-        
+
+        c.execute("""CREATE TABLE albums (
+                  release_group_mbid text PRIMARY KEY,
+                  artist_mbid text NOT NULL,
+                  album_title text NOT NULL,
+                  release_type text NOT NULL,
+                  release_date text NOT NULL,
+                  FOREIGN KEY (artist_mbid) REFERENCES artists (artist_mbid)
+                  )""")
+
         # mbid will be the primary key because it is wholey unique, annoyingly, I can't using it to search the db initially because that is the first thing I need from musicbrainz, I *could*
         # use lastfm to pull the mbid but then if there's a mismatch for whatever reason, it'll be annoying to find why I'm getting incorrect data
         # so instead, we use the artist_name as the index, what I'll be using to compare what there is locally to the DB, if that artist's name is in the db, we can assume we already have
@@ -64,13 +85,14 @@ class Database:
         conn.commit()
         conn.close()
 
-    def is_exists(self, artist_name) -> CachedArtist | None: # returns either the artist name if it exists or None if it doesn't
+    def is_exists(self, artist_name) -> bool: # returns true or false
         """ retrieves a given artist row if it exists """
 
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
 
-        c.execute("SELECT * FROM artists WHERE artist_name = ?", (artist_name,)) # need to encompass a variable with parenthesis to make it look like a tuple (for some reason,
+        c.execute("SELECT artist_mbid FROM artists WHERE artist_name = ?", (artist_name,))
+        # c.execute("SELECT * FROM artists WHERE artist_name = ?", (artist_name,)) # need to encompass a variable with parenthesis to make it look like a tuple (for some reason,
         # found it here https://www.sqlitetutorial.net/sqlite-python/sqlite-python-select/)
 
         row = c.fetchone()
@@ -80,20 +102,22 @@ class Database:
         conn.close()
 
         if row is None:
-            return None
+            return False
         
-        return CachedArtist(
-            artist_mbid = row[0],
-            artist_name = row[1],
-            artist_locale = row[2],
-            ended = row[3],
-            last_checked = row[4],
-            studio_albums = json.loads(row[5]),
-            eps =  json.loads(row[6]),
-            singles = json.loads(row[7]),
-            compilations = json.loads(row[8]),
-            live_albums = json.loads(row[9])
-        )
+        return True
+        
+        #return CachedArtist(
+        #    artist_mbid = row[0],
+        #    artist_name = row[1],
+        #    artist_locale = row[2],
+        #    ended = row[3],
+        #    last_checked = row[4],
+        #    studio_albums = json.loads(row[5]),
+        #    eps =  json.loads(row[6]),
+        #    singles = json.loads(row[7]),
+        #    compilations = json.loads(row[8]),
+        #    live_albums = json.loads(row[9])
+        #)
         
     def is_stale(self) -> list[CachedArtist]:
         """ checks for 'stale' artists to refresh cache """
@@ -105,14 +129,14 @@ class Database:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
 
-        c.execute("SELECT * FROM artists WHERE (? - last_checked) > ?", (t, one_minute_unix_time))
+        c.execute("SELECT * FROM artists LEFT JOIN albums ON artists.artist_mbid = albums.artist_mbid WHERE (? - last_checked) > ?", (t, one_minute_unix_time))
 
         rows = c.fetchall()
 
         conn.close()
 
-        if rows is None:
-            return None
+        #if rows is None:
+        #    return None
 
         for row in rows:
             outdated.append(CachedArtist(
@@ -129,6 +153,66 @@ class Database:
             ))
 
         return outdated
+    
+    def retrieve_albums(self, artist_name: str) -> CachedArtist | None:
+        """ retrieve albums from given artist_name """
+        
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        c.execute("""SELECT artists.artist_mbid, 
+                  artists.artist_name, 
+                  artists.artist_locale, 
+                  artists.ended, 
+                  artists.last_checked, 
+                  albums.album_title, 
+                  albums.release_type, 
+                  albums.release_date 
+                  FROM artists 
+                  LEFT JOIN albums 
+                  ON artists.artist_mbid = albums.artist_mbid 
+                  WHERE artists.artist_name = ?""", 
+                  (artist_name,))
+
+        rows = c.fetchall()
+        conn.close()
+
+        if not rows:
+            return None
+
+        artist = CachedArtist()
+
+        for row in rows:
+            artist_mbid, artist_name, artist_locale, ended, last_checked, album_title, release_type, release_date, = row
+
+            if not artist.artist_mbid:
+                artist.artist_mbid = artist_mbid
+                artist.artist_name = artist_name
+                artist.artist_locale = artist_locale
+                artist.ended = ended
+                artist.last_checked = last_checked
+
+            if album_title is not None:
+                artist.albums.append({
+                    "album_title": album_title,
+                    "release_type": release_type,
+                    "release_date": release_date,
+                })
+
+        return artist
+
+        #return CachedArtist(
+        #    artist_mbid = row[0],
+        #    artist_name = row[1],
+        #    artist_locale = row[2],
+        #    ended = row[3],
+        #    last_checked = row[4],
+        #    studio_albums = json.loads(row[5]),
+        #    eps =  json.loads(row[6]),
+        #    singles = json.loads(row[7]),
+        #    compilations = json.loads(row[8]),
+        #    live_albums = json.loads(row[9])
+        #)
 
     def add(self, artist: CachedArtist):
         """ adds new artist into db """
@@ -138,44 +222,82 @@ class Database:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
 
-        c.execute("""
-                INSERT INTO artists (
-                    artist_mbid,
-                    artist_name,
-                    artist_locale,
-                    ended,
-                    last_checked,
-                    studio_albums,
-                    eps,
-                    singles,
-                    compilations,
-                    live_albums
+        c.execute("""INSERT INTO artists (
+                  artist_mbid,
+                  artist_name,
+                  artist_locale,
+                  ended,
+                  last_checked
                   )
-                  VALUES (?,?,?,?,?,?,?,?,?,?)
+                  VALUES (?,?,?,?,?)
                   ON CONFLICT (artist_mbid)
-                  DO Update SET
-                    artist_name = excluded.artist_name,
-                    artist_locale = excluded.artist_locale,
-                    ended = excluded.ended,
-                    last_checked = excluded.last_checked,
-                    studio_albums = excluded.studio_albums,
-                    eps = excluded.eps,
-                    singles = excluded.singles,
-                    compilations = excluded.compilations,
-                    live_albums = excluded.live_albums
-                 """,
-                    (
-                    artist.artist_mbid,
-                    artist.artist_name,
-                    artist.artist_locale,
-                    int(artist.ended),
-                    t,
-                    json.dumps(artist.studio_albums),
-                    json.dumps(artist.eps),
-                    json.dumps(artist.singles),
-                    json.dumps(artist.compilations),
-                    json.dumps(artist.live_albums),
-                    ))
+                  DO UPDATE SET
+                  artist_name = excluded.artist_name,
+                  artist_locale = excluded.artist_locale,
+                  ended = excluded.ended,
+                  last_checked = excluded.last_checked
+                  """, 
+                  (artist.artist_mbid, artist.artist_name, artist.artist_locale, artist.ended, t))
+        
+        c.execute("DELETE FROM albums WHERE artist_mbid = ?", (artist.artist_mbid,))
+
+        rows = ({
+            "release_group_mbid": album["release_group_mbid"],
+            "artist_mbid": artist.artist_mbid,
+            "title": album["title"],
+            "release_type": album["release_type"],
+            "release_year": album["release_year"],
+        } for album in artist.albums)
+
+        c.executemany("""INSERT OR IGNORE INTO albums (
+                      release_group_mbid,
+                      artist_mbid,
+                      album_title,
+                      release_type,
+                      release_date
+                      )
+                      VALUES (:release_group_mbid, :artist_mbid, :title, :release_type, :release_year)
+                      """,
+                      rows)
+
+        #c.execute("""
+        #        INSERT INTO artists (
+        #            artist_mbid,
+        #            artist_name,
+        #            artist_locale,
+        #            ended,
+        #            last_checked,
+        #            studio_albums,
+        #            eps,
+        #            singles,
+        #            compilations,
+        #            live_albums
+        #          )
+        #          VALUES (?,?,?,?,?,?,?,?,?,?)
+        #          ON CONFLICT (artist_mbid)
+        #          DO Update SET
+        #            artist_name = excluded.artist_name,
+        #            artist_locale = excluded.artist_locale,
+        #            ended = excluded.ended,
+        #            last_checked = excluded.last_checked,
+        #            studio_albums = excluded.studio_albums,
+        #            eps = excluded.eps,
+        #            singles = excluded.singles,
+        #            compilations = excluded.compilations,
+        #            live_albums = excluded.live_albums
+        #         """,
+        #            (
+        #            artist.artist_mbid,
+        #            artist.artist_name,
+        #            artist.artist_locale,
+        #            int(artist.ended),
+        #            t,
+        #            json.dumps(artist.studio_albums),
+        #            json.dumps(artist.eps),
+        #            json.dumps(artist.singles),
+        #            json.dumps(artist.compilations),
+        #            json.dumps(artist.live_albums),
+        #            ))
         
         conn.commit()
 

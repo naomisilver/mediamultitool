@@ -79,8 +79,7 @@ def get_newest_album(upd_cfg: UpdaterConfig) -> LocalArtist:
     artist_data = []
 
     for artist in music_path.iterdir():
-        if artist.name.lower() in ("various artists", "playlist"):
-            print("hello")
+        if artist.name.lower() in ("various artists", "playlist", "lapfox trax"):
             continue # don't want to be attempting to download tracks from various artists, that would 100% bite me in the ass if I did...
 
         artist_name = artist.name
@@ -107,8 +106,7 @@ def get_newest_album(upd_cfg: UpdaterConfig) -> LocalArtist:
 
         artist_data.append(LocalArtist(
             artist_name = artist_name,
-            latest_album = f"{normalise(normalise_album(album))} ({regex_tag_check(album)})", # before adding to the Artist object, I could really do with normalising/generalising it similar to playlist, though I really don't feel like
-            # mirroring the same logic so will look at how I could handle it using regex. 
+            latest_album = f"{normalise(normalise_album(newest_album))} ({regex_tag_check(newest_album)})", # i had this as album for so long and not newest_album :|
             all_albums = [f"{normalise(normalise_album(album))} ({regex_tag_check(album)})" for album in all_albums] # god I love list comprehension
         )) # in my test script, I retained the release year in the as it should help to give another way to match data later
 
@@ -116,7 +114,7 @@ def get_newest_album(upd_cfg: UpdaterConfig) -> LocalArtist:
 
 def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalArtist) -> list:
     #list(albums) # if newest album gets passed just ensure it is a list
-    
+
     if upd_cfg.all_or_new: # if it is "all"/"ALL" ONLY then treat all all
         missing = [x for x in db_items if x not in local_artist.all_albums]
         return missing
@@ -125,11 +123,12 @@ def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalAr
         missing = []
 
         local_year = regex_tag_check(local_artist.latest_album)
-        for i in db_items:
-            db_year = regex_tag_check(i)
+        for item in db_items:
+            #print(f"({item["release_date"].split("-")[0]})")
+            db_year = regex_tag_check(f"({item['release_date'].split("-")[0]})")
 
             if db_year > local_year:
-                missing.append(i)
+                missing.append(f"{item['album_title']} ({db_year})")
 
         return missing
     
@@ -140,32 +139,37 @@ def update_cache(local_artist_data: LocalArtist): # unsure whether I should incl
     db = Database()
     
     for local_artist in local_artist_data: # add new if it doesn't exist
-        a = db.is_exists(local_artist.artist_name) # returns a CachedArtist object containing all the current DB data 
-        if a is None: # if not in DB
+        #a = db.is_exists(local_artist.artist_name) # returns a CachedArtist object containing all the current DB data 
+        #if a is None: # if not in DB
 
-            a = fetch_artist_mbid(local_artist.artist_name)
-            logger.info("%s", a)
+        if not db.is_exists(local_artist.artist_name):
 
-            b = fetch_artist_albums(a)
-            logger.error("%s: %s", b.artist_name, b.studio_albums)
+            mb_artist = fetch_artist_mbid(local_artist.artist_name)
+            logger.info("%s", mb_artist)
 
-            db.add(b)
+            mb_artist = fetch_artist_albums(mb_artist)
+            #logger.error("%s: %s", mb_artist.artist_name, mb_artist.albums)
+            for album in mb_artist.albums:
+                if "studio_album" in album["release_type"]:
+                    logger.error("%s: %s", mb_artist.artist_name, album)
 
-    stale_artists = db.is_stale()
-    for stale_a in stale_artists:
-        if bool(stale_a.ended) is True and t - stale_a.last_checked < one_year_unix_time: # if ended & last checked less than a year ago
-            logger.debug("Skipping updating artist %s, ended and last checked < a year ago", stale_a.artist_name)
-            continue
+            db.add(mb_artist)
 
-        if stale_a.ended is not True and t - stale_a.last_checked < one_week_unix_time: # if not & last checked less than a week ago 
-            logger.debug("Skipping updating artist %s, last checked < a week ago", stale_a.artist_name)
-            continue
+    #stale_artists = db.is_stale()
+    #for stale_a in stale_artists:
+    #    if bool(stale_a.ended) is True and t - stale_a.last_checked < one_year_unix_time: # if ended & last checked less than a year ago
+    #        logger.debug("Skipping updating artist %s, ended and last checked < a year ago", stale_a.artist_name)
+    #        continue
 
-        updated_a = fetch_artist_albums(stale_a)
+    #    if stale_a.ended is not True and t - stale_a.last_checked < one_week_unix_time: # if not & last checked less than a week ago 
+    #        logger.debug("Skipping updating artist %s, last checked < a week ago", stale_a.artist_name)
+    #        continue
 
-        logger.info("Updated artist: %s", updated_a.artist_name)
+    #    updated_a = fetch_artist_albums(stale_a)
 
-        db.add(updated_a)
+    #    logger.info("Updated artist: %s", updated_a.artist_name)
+
+    #    db.add(updated_a)
 
 def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist):
     """ decide based on local data what to do 
@@ -187,14 +191,22 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
     db = Database()
 
     for local_artist in local_artist_data:
-        db_artist = db.is_exists(local_artist.artist_name)
+        #db_artist = db.is_exists(local_artist.artist_name)
+
+        db_artist = db.retrieve_albums(local_artist.artist_name)
 
         for album_type, ignore in upd_cfg.ignore.items():
             if ignore:
                 continue
 
-            db_items = getattr(db_artist, album_type)
+            #db_items = getattr(db_artist, album_type)
+            db_items = [album for album in db_artist.albums if album["release_type"] == album_type]
             
+            if local_artist.artist_name.lower() == "30 seconds to mars":
+                print(local_artist.all_albums)
+                for a in db_items:
+                    print(a)
+
             missing = compare_albums(upd_cfg, db_items, local_artist) # not perfect, need to dive deeper, though, slay the spire 2 came out 4 minutes ago
             if not missing: # and I NEEED to jump on that :)
                 continue

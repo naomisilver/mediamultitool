@@ -91,13 +91,7 @@ def fetch_artist_mbid(a_name) -> CachedArtist: # i kinda hated function annotati
 
 def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
     """ fetches and returns CachedArtist with appended albums """
-
-    artist.studio_albums = []
-    artist.eps = []
-    artist.singles = [] # no longer appending to an existing list of existing albums and causing duplicates
-    artist.compilations = []
-    artist.live_albums = []
-
+    
     query = (
         f"arid:{artist.artist_mbid} AND primarytype:(album OR single OR ep) "
         #"AND NOT secondarytype:live "
@@ -136,8 +130,11 @@ def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
                 break
 
             title = rg["title"]
+            release_group_mbid = rg["id"]
+
             try:
-                release_year = rg["first-release-date"].split("-", 1)[0]
+                #release_year = rg["first-release-date"].split("-", 1)[0]
+                release_year = rg["first-release-date"]
             except KeyError as e:
                 continue # this was causing some weird behaviour, specifically for the band "american football", it would find an album "all of us" that doesn't exist
             # when I pull the same data from the same url it'd be using, so instead skip instances of this. 
@@ -145,23 +142,28 @@ def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
             if rg["primary-type"].lower() != "album":
                 if rg["primary-type"].lower() == "single": # singles also include singles of tracks later released in an actual album, again, idrk if I can do someting
                     # about that as some artists will release singles and NOT later release them as part of an album which is the use case I'm trying to capture
-                    artist.singles.append(f"{normalise(title)} ({release_year})")
+                    #artist.singles.append(f"{normalise(title)} ({release_year})")
+                    artist.albums.append({"release_group_mbid": release_group_mbid, "title": f"{normalise(title)}", "release_year": release_year, "release_type": "single"})
 
                 if rg["primary-type"].lower() == "ep": # some eps seem to be seen as studio albums from musicbrainz and idrk if I can do anything about that
                     # and it seems to include "sessions" like aol and shit, will look into if I can set a param to ignore them
-                    artist.eps.append(f"{normalise(title)} ({release_year})")
+                    #artist.eps.append(f"{normalise(title)} ({release_year})")
+                    artist.albums.append({"release_group_mbid": release_group_mbid, "title": f"{normalise(title)}", "release_year": release_year, "release_type": "ep"})
                 
-                continue
+                continue # the messy appends NEED to be sorted, I'm just deadass repeating the same append statement 5 times, im too tired to sort that, I just need to test
+            # my new database/database methods
 
             try:
                 for st in rg["secondary-types"]:
                     if "live" in st.lower():
-                        artist.live_albums.append(f"{normalise(title)} ({release_year})")
+                        #artist.live_albums.append(f"{normalise(title)} ({release_year})")
+                        artist.albums.append({"release_group_mbid": release_group_mbid, "title": f"{normalise(title)}", "release_year": release_year, "release_type": "live_album"})
                     if "compilation" in st.lower():
-                        artist.compilations.append(f"{normalise(title)} ({release_year})")
+                        #artist.compilations.append(f"{normalise(title)} ({release_year})")
+                        artist.albums.append({"release_group_mbid": release_group_mbid, "title": f"{normalise(title)}", "release_year": release_year, "release_type": "compilation"})
 
-            except KeyError: # if secondary-types doesn't exist then it has to be a studio album
-                artist.studio_albums.append(f"{normalise(title)} ({release_year})")
+            except KeyError:
+                artist.albums.append({"release_group_mbid": release_group_mbid, "title": f"{normalise(title)}", "release_year": release_year, "release_type": "studio_album"})
 
         count = data["count"] # if the count value indicating the amount of results isn't present, break after the first cycle as theres no pages to ination XD
         if count is None:
