@@ -129,30 +129,45 @@ class Database:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
 
-        c.execute("SELECT * FROM artists LEFT JOIN albums ON artists.artist_mbid = albums.artist_mbid WHERE (? - last_checked) > ?", (t, one_minute_unix_time))
+        c.execute("""SELECT artists.artist_mbid, 
+                  artists.artist_name, 
+                  artists.artist_locale, 
+                  artists.ended, 
+                  artists.last_checked, 
+                  albums.album_title, 
+                  albums.release_type, 
+                  albums.release_date 
+                  FROM artists 
+                  LEFT JOIN albums 
+                  ON artists.artist_mbid = albums.artist_mbid 
+                  WHERE (? - last_checked) > ?""", (t, one_week_unix_time))
 
         rows = c.fetchall()
 
         conn.close()
 
-        #if rows is None:
-        #    return None
+        artists = {}
 
         for row in rows:
-            outdated.append(CachedArtist(
-                artist_mbid = row[0],
-                artist_name = row[1],
-                artist_locale = row[2],
-                ended = row[3],
-                last_checked = row[4],
-                studio_albums = json.loads(row[5]),
-                eps =  json.loads(row[6]),
-                singles = json.loads(row[7]),
-                compilations = json.loads(row[8]),
-                live_albums = json.loads(row[9])
-            ))
+            artist_mbid, artist_name, artist_locale, ended, last_checked, album_title, release_type, release_date, = row
 
-        return outdated
+            if not artist_mbid in artists:
+                artists[artist_mbid] = CachedArtist (
+                    artist_mbid = artist_mbid,
+                    artist_name = artist_name,
+                    artist_locale = artist_locale,
+                    ended = ended,
+                    last_checked = last_checked
+                )
+
+            if album_title is not None:
+                artists[artist_mbid].albums.append({
+                        "album_title": album_title,
+                        "release_type": release_type,
+                        "release_date": release_date,
+                    })
+
+        return list(artists.values())
     
     def retrieve_albums(self, artist_name: str) -> CachedArtist | None:
         """ retrieve albums from given artist_name """
@@ -200,19 +215,25 @@ class Database:
                 })
 
         return artist
+    
+    def retrieve_artist_names(self):
 
-        #return CachedArtist(
-        #    artist_mbid = row[0],
-        #    artist_name = row[1],
-        #    artist_locale = row[2],
-        #    ended = row[3],
-        #    last_checked = row[4],
-        #    studio_albums = json.loads(row[5]),
-        #    eps =  json.loads(row[6]),
-        #    singles = json.loads(row[7]),
-        #    compilations = json.loads(row[8]),
-        #    live_albums = json.loads(row[9])
-        #)
+        artists = []
+
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor() 
+
+        c.execute("SELECT artist_name FROM artists")
+
+        rows = c.fetchall()
+        conn.close()
+
+        for row in rows:
+            artist_name, = row # even if you're only unpacking a single element, you still need to include the comma otherwise you'll end up appending tuples as apposed to strings interesting
+
+            artists.append(artist_name)
+
+        return artists
 
     def add(self, artist: CachedArtist):
         """ adds new artist into db """
@@ -259,49 +280,35 @@ class Database:
                       VALUES (:release_group_mbid, :artist_mbid, :title, :release_type, :release_year)
                       """,
                       rows)
-
-        #c.execute("""
-        #        INSERT INTO artists (
-        #            artist_mbid,
-        #            artist_name,
-        #            artist_locale,
-        #            ended,
-        #            last_checked,
-        #            studio_albums,
-        #            eps,
-        #            singles,
-        #            compilations,
-        #            live_albums
-        #          )
-        #          VALUES (?,?,?,?,?,?,?,?,?,?)
-        #          ON CONFLICT (artist_mbid)
-        #          DO Update SET
-        #            artist_name = excluded.artist_name,
-        #            artist_locale = excluded.artist_locale,
-        #            ended = excluded.ended,
-        #            last_checked = excluded.last_checked,
-        #            studio_albums = excluded.studio_albums,
-        #            eps = excluded.eps,
-        #            singles = excluded.singles,
-        #            compilations = excluded.compilations,
-        #            live_albums = excluded.live_albums
-        #         """,
-        #            (
-        #            artist.artist_mbid,
-        #            artist.artist_name,
-        #            artist.artist_locale,
-        #            int(artist.ended),
-        #            t,
-        #            json.dumps(artist.studio_albums),
-        #            json.dumps(artist.eps),
-        #            json.dumps(artist.singles),
-        #            json.dumps(artist.compilations),
-        #            json.dumps(artist.live_albums),
-        #            ))
         
         conn.commit()
 
         conn.close()
+
+    def remove_missing(self, a_names: list):
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        query = f"SELECT artist_mbid FROM artists WHERE artist_name IN ({','.join(['?']*len(a_names))})"
+
+        c.execute(query, a_names)
+
+        rows = c.fetchall()
+
+        a_mbids = []
+
+        for row in rows:
+            artist_mbid, = row
+            a_mbids.append(artist_mbid)
+
+        query = f"DELETE FROM artists WHERE artist_mbid IN ({','.join(['?']*len(a_mbids))})"
+
+        c.execute(query, a_mbids)
+
+        conn.commit()
+        conn.close()
+
+        
 
 """
     Sources/credit:
@@ -321,5 +328,7 @@ class Database:
 
         - unix timestamping:        https://www.geeksforgeeks.org/python/how-to-convert-datetime-to-unix-timestamp-in-python/
         - better unix time:         https://stackoverflow.com/questions/16755394/what-is-the-easiest-way-to-get-current-gmt-time-in-unix-timestamp-format
+
+        - SELECT with list as arg:  https://stackoverflow.com/questions/5766230/select-from-sqlite-table-where-rowid-in-list-using-python-sqlite3-db-api-2-0
    
 """

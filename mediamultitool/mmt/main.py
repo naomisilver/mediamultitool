@@ -91,8 +91,6 @@ def run(args, cfg):
         for item in split_list:
             excluded_list.append(item.lower().strip().rstrip())
 
-        print(excluded_list)
-
         updater_cfg = UpdaterConfig(
             local_music_path = Path(cfg.core.local_music_path),
             update_cache = args.update_cache,

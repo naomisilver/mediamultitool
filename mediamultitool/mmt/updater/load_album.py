@@ -135,11 +135,9 @@ def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalAr
 
         return missing
     
-def update_cache(local_artist_data: LocalArtist): # unsure whether I should include this here or move to a seperate file, will sleep on it
+def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether I should include this here or move to a seperate file, will sleep on it
     
     t = int(time.time())
-
-    db = Database()
     
     for local_artist in local_artist_data: # add new if it doesn't exist
         if not db.is_exists(local_artist.artist_name):
@@ -157,13 +155,6 @@ def update_cache(local_artist_data: LocalArtist): # unsure whether I should incl
 
     stale_artists = db.is_stale()
     for stale_a in stale_artists:
-        if bool(stale_a.ended) is True and t - stale_a.last_checked < one_year_unix_time: # if ended & last checked less than a year ago
-            logger.debug("Skipping updating artist %s, ended and last checked < a year ago", stale_a.artist_name)
-            continue
-
-        if stale_a.ended is not True and t - stale_a.last_checked < one_week_unix_time: # if not & last checked less than a week ago 
-            logger.debug("Skipping updating artist %s, last checked < a week ago", stale_a.artist_name)
-            continue
 
         updated_a = fetch_artist_albums(stale_a)
 
@@ -171,21 +162,45 @@ def update_cache(local_artist_data: LocalArtist): # unsure whether I should incl
 
         db.add(updated_a)
 
+def delete_local_missing(upd_cfg: UpdaterConfig, db: Database):
+    db_artists = db.retrieve_artist_names()
+    local_artists = [Path(x).name for x in upd_cfg.local_music_path.iterdir()]
+
+    local_missing = list(set(db_artists) - set(local_artists))
+
+    if local_missing:
+        logger.info("Found %s missing locally, removing from local cache", len(local_missing))
+        db.remove_missing(local_missing)
+
+def add_db_missing(upd_cfg: UpdaterConfig, db: Database):
+    db_artists = db.retrieve_artist_names()
+    local_artists = [Path(x).name for x in upd_cfg.local_music_path.iterdir()]
+
+    db_missing = list(set(local_artists) - set(db_artists))
+
+    if db_missing:
+        logger.info("Found %s new artists, updating local cache", len(db_missing))
+        return True
+
+    return False
+
 def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist):
     """ decide, based on local data, what to do 
     
         will get moved to a "pipeline" method when the modules get turned into classes
     """
+
+    db = Database()
+
+    delete_local_missing(upd_cfg, db) # happen before updating so its not querying mb for soon to be deleted data
     
-    if upd_cfg.update_cache: # this can be done better when I move each module to a class, this can be called/run the require logic from main
-        update_cache(local_artist_data)
+    if upd_cfg.update_cache or add_db_missing(upd_cfg, db): # this can be done better when I move each module to a class, this can be called/run the require logic from main
+        update_cache(local_artist_data, db)
     elif os.path.isfile(DB_PATH):
         pass
     else:
         logger.error("The local cache has not yet been created, please run 'mmt updater -update-cache to generate cache")
         raise SystemExit
-
-    db = Database()
 
     for local_artist in local_artist_data:
         db_artist = db.retrieve_albums(local_artist.artist_name)
@@ -208,5 +223,6 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
                     https://www.geeksforgeeks.org/python/check-for-balanced-parentheses-in-python/
                     - I'm finally biting the bullet and I have a feeling this regex sources section is going to get pretty large... 
 
-        - compare 2 lists, output missing   https://stackoverflow.com/questions/78488469/sqlite-insert-or-replace-and-on-conflict-do-nothing 
+        - compare 2 lists, output missing https://stackoverflow.com/questions/78488469/sqlite-insert-or-replace-and-on-conflict-do-nothing... idrk what this is in relation to
+          but I went to compare 2 lists again and used this: https://www.geeksforgeeks.org/python/python-difference-two-lists/ for set difference
 """
