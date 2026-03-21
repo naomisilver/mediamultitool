@@ -87,6 +87,12 @@ def run(args, cfg):
         except TypeError:
             only_list = []
 
+        split_list = cfg.updater.excluded.split(",")
+        for item in split_list:
+            excluded_list.append(item.lower().strip().rstrip())
+
+        print(excluded_list)
+
         updater_cfg = UpdaterConfig(
             local_music_path = Path(cfg.core.local_music_path),
             update_cache = args.update_cache,
@@ -98,7 +104,8 @@ def run(args, cfg):
                 "single": cfg.updater.ignore_singles,
                 "compilation": cfg.updater.ignore_compilations,
                 "live_album": cfg.updater.ignore_live_albums,
-            }
+            },
+            excluded_artists = excluded_list
         )
 
         get_newest_album(updater_cfg, excluded_list, only_list)

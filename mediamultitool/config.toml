@@ -54,6 +54,11 @@ ignore_live_albums = true
 # to only showing new) this can be overridden by giving -new or -all when running updater
 check_new_or_all = ''
 
+# excluded list is a list of the directories you want to prevent matching for, you also have the option to do this on the
+# command line too with --excluding however this allows to exclude permanent fixtures of your library like "Various Artists"
+# or "Artist Collection". Seperate entries here using a command (,)
+excluded = 'Various Artists, Playlists'
+
 [app.misc]
 # versioning DO NOT CHANGE
 version = '0.1.4'

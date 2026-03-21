@@ -83,7 +83,7 @@ def get_newest_album(upd_cfg: UpdaterConfig, excluded_list: list, only_list: lis
             if artist.name.lower() not in only_list:
                 continue
 
-        if artist.name.lower() in ("various artists", "playlists", "lapfox trax") or artist.name.lower() in excluded_list:
+        if artist.name.lower() in excluded_list:
             continue # don't want to be attempting to download tracks from various artists, that would 100% bite me in the ass if I did...
 
         artist_name = artist.name
