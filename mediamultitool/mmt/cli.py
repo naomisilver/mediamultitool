@@ -81,7 +81,10 @@ def validate_input(parser, args, cfg, APP_DIR): # there HAS to be a better way h
 
         if args.command == "updater":
             if args.new and args.all:
-                parser.error("Both -new and -all are mutually exclusive, please pick one :)")
+                parser.error("Both --new and --all are mutually exclusive, please pick one :)")
+
+            if args.only and args.excluding:
+                parser.error("Both --only and --excluding are mutually exclusive")
 
     except AttributeError:
         pass
@@ -145,12 +148,13 @@ def mmt():
     # updater subparsing
     updater_parser = subparsers.add_parser("updater", parents=[common_parser]) # moving away from the single letter commands
     #updater_parser.add_argument("search_artist" , nargs="*", help="induvidual artist names to search for")
-    updater_parser.add_argument("-new", action="store_true", help="only compare against newer albums than is in your collection")
-    updater_parser.add_argument("-all", action="store_true", help="compare against all albums in your collection")
+    updater_parser.add_argument("-n", "--new", action="store_true", help="only compare against newer albums than is in your collection")
+    updater_parser.add_argument("-a", "--all", action="store_true", help="compare against all albums in your collection")
     updater_parser.add_argument("-u", "--update-cache", dest="update_cache", action="store_true", help="update the local cache")
+    updater_parser.add_argument("-o", "--only", dest="only", nargs="+", type=str, help="scan for albums from the given artist(s)")
+    updater_parser.add_argument("-e", "--excluding", dest="excluding", nargs="+", type=str, help="scan for albums excluding the given artist(s)")
     updater_parser.set_defaults(command="updater")
     
-
     args = parser.parse_args()
 
     try:

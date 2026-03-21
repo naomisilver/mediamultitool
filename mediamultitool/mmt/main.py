@@ -69,28 +69,23 @@ def run(args, cfg):
 
     if args.command == "updater":
 
-        #if args.all or args.new:
-            #if args.all:
-                #all_or_new = True
-            #elif args.new:
-                #all_or_new = False
-        
-        #elif cfg.updater.check_new_or_all:
-            #if cfg.updater.check_new_or_all.lower() == "all":
-                #all_or_new = True
-            #elif cfg.updater.check_new_or_all.lower() == "new":
-                #all_or_new = False
-
-        #else:
-            #all_or_new = False
-
-        all_or_new = ( # if given when invoking, use that, else use the config, else default to showing new
-            True if args.all 
-            else False if args.new # tried the above to get it to work but was ugly, I used ternary operator before and wondered if you could nest them, low and behold
-            else True if cfg.updater.check_new_or_all == "all" # you can :)
+        all_or_new = (
+            True if args.all
+            else False if args.new
+            else True if cfg.updater.check_new_or_all == "all"
             else False if cfg.updater.check_new_or_all == "new"
             else False
         )
+
+        try:
+            excluded_list = [x.lower() for x in args.excluding]
+        except TypeError:
+            excluded_list = []
+
+        try:
+            only_list = [x.lower() for x in args.only]
+        except TypeError:
+            only_list = []
 
         updater_cfg = UpdaterConfig(
             local_music_path = Path(cfg.core.local_music_path),
@@ -106,7 +101,7 @@ def run(args, cfg):
             }
         )
 
-        get_newest_album(updater_cfg)
+        get_newest_album(updater_cfg, excluded_list, only_list)
 
     logger.info("Completed in: %s seconds", round(time.time() - start_time, 3))
 

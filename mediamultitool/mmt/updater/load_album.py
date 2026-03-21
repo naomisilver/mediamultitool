@@ -72,14 +72,18 @@ def normalise_album(s: str) -> str:
 
     return s
 
-def get_newest_album(upd_cfg: UpdaterConfig) -> LocalArtist:
+def get_newest_album(upd_cfg: UpdaterConfig, excluded_list: list, only_list: list) -> LocalArtist:
     """ retrieve artists and their latest albums """
 
     music_path = upd_cfg.local_music_path
     artist_data = []
 
     for artist in music_path.iterdir():
-        if artist.name.lower() in ("various artists", "playlist", "lapfox trax"):
+        if only_list:
+            if artist.name.lower() not in only_list:
+                continue
+
+        if artist.name.lower() in ("various artists", "playlists", "lapfox trax") or artist.name.lower() in excluded_list:
             continue # don't want to be attempting to download tracks from various artists, that would 100% bite me in the ass if I did...
 
         artist_name = artist.name
@@ -124,7 +128,6 @@ def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalAr
 
         local_year = regex_tag_check(local_artist.latest_album)
         for item in db_items:
-            #print(f"({item["release_date"].split("-")[0]})")
             db_year = regex_tag_check(f"({item['release_date'].split("-")[0]})")
 
             if db_year > local_year:
@@ -139,9 +142,6 @@ def update_cache(local_artist_data: LocalArtist): # unsure whether I should incl
     db = Database()
     
     for local_artist in local_artist_data: # add new if it doesn't exist
-        #a = db.is_exists(local_artist.artist_name) # returns a CachedArtist object containing all the current DB data 
-        #if a is None: # if not in DB
-
         if not db.is_exists(local_artist.artist_name):
 
             mb_artist = fetch_artist_mbid(local_artist.artist_name)
@@ -155,35 +155,32 @@ def update_cache(local_artist_data: LocalArtist): # unsure whether I should incl
 
             db.add(mb_artist)
 
-    #stale_artists = db.is_stale()
-    #for stale_a in stale_artists:
-    #    if bool(stale_a.ended) is True and t - stale_a.last_checked < one_year_unix_time: # if ended & last checked less than a year ago
-    #        logger.debug("Skipping updating artist %s, ended and last checked < a year ago", stale_a.artist_name)
-    #        continue
+    stale_artists = db.is_stale()
+    for stale_a in stale_artists:
+        if bool(stale_a.ended) is True and t - stale_a.last_checked < one_year_unix_time: # if ended & last checked less than a year ago
+            logger.debug("Skipping updating artist %s, ended and last checked < a year ago", stale_a.artist_name)
+            continue
 
-    #    if stale_a.ended is not True and t - stale_a.last_checked < one_week_unix_time: # if not & last checked less than a week ago 
-    #        logger.debug("Skipping updating artist %s, last checked < a week ago", stale_a.artist_name)
-    #        continue
+        if stale_a.ended is not True and t - stale_a.last_checked < one_week_unix_time: # if not & last checked less than a week ago 
+            logger.debug("Skipping updating artist %s, last checked < a week ago", stale_a.artist_name)
+            continue
 
-    #    updated_a = fetch_artist_albums(stale_a)
+        updated_a = fetch_artist_albums(stale_a)
 
-    #    logger.info("Updated artist: %s", updated_a.artist_name)
+        logger.info("Updated artist: %s", updated_a.artist_name)
 
-    #    db.add(updated_a)
+        db.add(updated_a)
 
 def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist):
-    """ decide based on local data what to do 
+    """ decide, based on local data, what to do 
     
         will get moved to a "pipeline" method when the modules get turned into classes
     """
     
-    if upd_cfg.update_cache:
+    if upd_cfg.update_cache: # this can be done better when I move each module to a class, this can be called/run the require logic from main
         update_cache(local_artist_data)
-    # i don't like doing this here, I'd prefer have this in main somehow but I don't think I can in a clean way. I may be able to do this cleaner and more obviously
-    # when I "class-ify" this module
     elif os.path.isfile(DB_PATH):
         pass
-
     else:
         logger.error("The local cache has not yet been created, please run 'mmt updater -update-cache to generate cache")
         raise SystemExit
@@ -191,21 +188,13 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
     db = Database()
 
     for local_artist in local_artist_data:
-        #db_artist = db.is_exists(local_artist.artist_name)
-
         db_artist = db.retrieve_albums(local_artist.artist_name)
 
         for album_type, ignore in upd_cfg.ignore.items():
             if ignore:
                 continue
 
-            #db_items = getattr(db_artist, album_type)
             db_items = [album for album in db_artist.albums if album["release_type"] == album_type]
-            
-            if local_artist.artist_name.lower() == "30 seconds to mars":
-                print(local_artist.all_albums)
-                for a in db_items:
-                    print(a)
 
             missing = compare_albums(upd_cfg, db_items, local_artist) # not perfect, need to dive deeper, though, slay the spire 2 came out 4 minutes ago
             if not missing: # and I NEEED to jump on that :)
