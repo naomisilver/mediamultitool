@@ -35,10 +35,12 @@ class PlaylistConfig:
 @dataclass(slots=True)
 class UpdaterConfig: # small now but will make things easier if I do move to automatic downloading via streamrip
     local_music_path: Path
+    output_dir: Path
     update_cache: bool
     all_or_new: bool
+    output_to_console: bool = False
     ignore: dict[str, bool] = field(default_factory=dict) # store the ignores in a dictionary so I can iterate over it, no more big if block
-    excluded_artists: list = field(default_factory=list)
+    excluded_artists: list = field(default_factory=list) 
 
 """
     Sources/credit:

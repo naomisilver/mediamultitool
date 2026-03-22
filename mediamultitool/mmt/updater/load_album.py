@@ -11,6 +11,8 @@ import logging
 import re
 import time
 import os
+import json
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +71,7 @@ def normalise_album(s: str) -> str:
     """ helper to generalise a given album e.g., "(1999), (Live)" etc """
 
     s = s.split(" - ", 1)[-1].split("(", 1)[0].strip()
+    s = s.replace("-", " ")
 
     return s
 
@@ -117,14 +120,27 @@ def get_newest_album(upd_cfg: UpdaterConfig, excluded_list: list, only_list: lis
     process_local_artists(upd_cfg, artist_data)
 
 def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalArtist) -> list:
-    #list(albums) # if newest album gets passed just ensure it is a list
 
-    if upd_cfg.all_or_new: # if it is "all"/"ALL" ONLY then treat all all
-        missing = [x for x in db_items if x not in local_artist.all_albums]
+    if upd_cfg.all_or_new: # use only the name of the chached db album and substring match to local albums
+        local_titles = [normalise(a.split("(")[0]) for a in local_artist.all_albums]
+
+        missing = []
+
+        for x in db_items:
+            db_title = normalise_album(normalise(x['album_title']))#.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')
+            db_year = x['release_date'].split('-')[0]
+
+            #if db_title not in local_titles:
+            if not any(db_title in lt or lt in db_title for lt in local_titles): # this is not really "safe" matching as any instance of either local or cache album names
+                missing.append(f"{db_title} ({db_year})") # will be used to match, and situations like "One More Time... PART 2" would match with "One More Time" where PART 2 dropped
+                # new tracks, I could match only local titles to cache titles but because I deal with release-groups and not releases (for very good reason), I would need to peform a
+                # thousand lines of normalisation to get even close to a "safer" match
+
         return missing
     
-    else: # treat everything else as only checking new 
-        missing = []
+    else: # ignores the name of the album and uses only the year to compare. this isn't ideal as someone may release 3 studio albums in a year and if the newest locally is the first
+        missing = [] # of those 3, it misses the other two. the alternative would be querying musicbrainz to get the release list and compare local to that. Or save a list of the release
+        # order when cacheing locally. That would mean another table and saving the list in order
 
         local_year = regex_tag_check(local_artist.latest_album)
         for item in db_items:
@@ -136,6 +152,7 @@ def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalAr
         return missing
     
 def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether I should include this here or move to a seperate file, will sleep on it
+    """ scans local collection, and updates local cache, based on existance/last_checked, from musicbrainz """
     
     t = int(time.time())
     
@@ -143,13 +160,10 @@ def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether
         if not db.is_exists(local_artist.artist_name):
 
             mb_artist = fetch_artist_mbid(local_artist.artist_name)
-            logger.info("%s", mb_artist)
+            logger.info("Found artist %s with the mbid: %s", mb_artist.artist_name, mb_artist.artist_mbid)
 
             mb_artist = fetch_artist_albums(mb_artist)
-            #logger.error("%s: %s", mb_artist.artist_name, mb_artist.albums)
-            for album in mb_artist.albums:
-                if "studio_album" in album["release_type"]:
-                    logger.error("%s: %s", mb_artist.artist_name, album)
+            logger.info("Found %s albums for artist: %s", len(mb_artist.albums), mb_artist.artist_name)
 
             db.add(mb_artist)
 
@@ -163,6 +177,8 @@ def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether
         db.add(updated_a)
 
 def delete_local_missing(upd_cfg: UpdaterConfig, db: Database):
+    """ removes artists no longer present in local collection and removes them from local cache """
+
     db_artists = db.retrieve_artist_names()
     local_artists = [Path(x).name for x in upd_cfg.local_music_path.iterdir()]
 
@@ -173,6 +189,8 @@ def delete_local_missing(upd_cfg: UpdaterConfig, db: Database):
         db.remove_missing(local_missing)
 
 def add_db_missing(upd_cfg: UpdaterConfig, db: Database):
+    """ takes new artists in local collection to add to local cache """
+
     db_artists = db.retrieve_artist_names()
     local_artists = [Path(x).name for x in upd_cfg.local_music_path.iterdir()]
 
@@ -193,6 +211,10 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
     db = Database()
 
     delete_local_missing(upd_cfg, db) # happen before updating so its not querying mb for soon to be deleted data
+
+    stale_artists = db.is_stale()
+    if stale_artists:
+        logger.info("You have %s outdated artists, you may want to run 'mmt updater --update-cache'", len(stale_artists))
     
     if upd_cfg.update_cache or add_db_missing(upd_cfg, db): # this can be done better when I move each module to a class, this can be called/run the require logic from main
         update_cache(local_artist_data, db)
@@ -201,6 +223,8 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
     else:
         logger.error("The local cache has not yet been created, please run 'mmt updater -update-cache to generate cache")
         raise SystemExit
+    
+    missing_albums = {}
 
     for local_artist in local_artist_data:
         db_artist = db.retrieve_albums(local_artist.artist_name)
@@ -211,11 +235,35 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
 
             db_items = [album for album in db_artist.albums if album["release_type"] == album_type]
 
-            missing = compare_albums(upd_cfg, db_items, local_artist) # not perfect, need to dive deeper, though, slay the spire 2 came out 4 minutes ago
-            if not missing: # and I NEEED to jump on that :)
+            missing = compare_albums(upd_cfg, db_items, local_artist)
+            if not missing:
                 continue
 
-            logger.warning("Missing %s for artist %s: %s", album_type, local_artist.artist_name, missing)
+            missing_albums[local_artist.artist_name] = {}
+            missing_albums[local_artist.artist_name][f"{album_type}s"] = missing
+
+            if upd_cfg.output_to_console:
+                logger.warning("Missing %s %ss for artist %s: %s", len(missing), album_type, local_artist.artist_name, missing)
+
+            elif len(missing) <= 2:
+                logger.warning("Missing %s %ss for artist %s: %s", len(missing), album_type, local_artist.artist_name, missing)
+
+            elif len(missing) > 2:
+                logger.warning("Missing %s %ss for artist %s: %s + %s more", len(missing), album_type, local_artist.artist_name, missing[:2], len(missing) - 2)
+
+    if not upd_cfg.output_to_console:
+        write_output_to_json(upd_cfg, missing_albums)
+
+def write_output_to_json(upd_cfg: UpdaterConfig, missing_albums: dict[str: list[str]]):
+    """ writes the given dict to json file """
+    
+    json_filename = str(datetime.datetime.now())
+    json_path = Path(upd_cfg.output_dir / f"{json_filename[:19]}.json")
+    with open(json_path, "w") as f:
+        json.dump(missing_albums, f, indent=4, ensure_ascii=False)
+
+    logger.info("Written missing albums to '%s'", json_path)
+
 
 """
     Sources/credit:
@@ -225,4 +273,7 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
 
         - compare 2 lists, output missing https://stackoverflow.com/questions/78488469/sqlite-insert-or-replace-and-on-conflict-do-nothing... idrk what this is in relation to
           but I went to compare 2 lists again and used this: https://www.geeksforgeeks.org/python/python-difference-two-lists/ for set difference
+
+        - not converting unicode to unicode escape sequences: https://docs.python.org/3/library/json.html
+            - kinda sucks when you're dealing with cyrillic, japanese etc... album names
 """

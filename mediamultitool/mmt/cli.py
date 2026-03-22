@@ -153,6 +153,7 @@ def mmt():
     updater_parser.add_argument("-u", "--update-cache", dest="update_cache", action="store_true", help="update the local cache")
     updater_parser.add_argument("-o", "--only", dest="only", nargs="+", type=str, help="scan for albums from the given artist(s)")
     updater_parser.add_argument("-e", "--excluding", dest="excluding", nargs="+", type=str, help="scan for albums excluding the given artist(s)")
+    updater_parser.add_argument("-p", "--print", dest="print_console", action="store_true",help="Outputs missing albums to the console rather than file")
     updater_parser.set_defaults(command="updater")
     
     args = parser.parse_args()

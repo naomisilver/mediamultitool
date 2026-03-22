@@ -93,9 +93,11 @@ def run(args, cfg):
 
         updater_cfg = UpdaterConfig(
             local_music_path = Path(cfg.core.local_music_path),
+            output_dir = Path(cfg.core.default_output),
             update_cache = args.update_cache,
             # all_or_new = True if cfg.updater.check_new_or_all.lower() == "all" else False, # had it inverse but I'd prefer it defaults to new if it isn't explcitly "all"
             all_or_new = all_or_new,
+            output_to_console = args.print_console,
             ignore = {
                 "studio_album": cfg.updater.ignore_studio_albums,
                 "ep": cfg.updater.ignore_eps,
