@@ -131,7 +131,7 @@ def mmt():
     
     # all common options (shared across commands)
     common_parser = argparse.ArgumentParser(add_help=False)
-    common_parser.add_argument("-r", "--recursive", action="store_true", help="perform action recursively") # this is going to be depricated in the future
+    #common_parser.add_argument("-r", "--recursive", action="store_true", help="perform action recursively") # this is going to be depricated in the future
 
     subparsers = parser.add_subparsers(dest="command", title="subcommands")
 
@@ -147,13 +147,13 @@ def mmt():
 
     # updater subparsing
     updater_parser = subparsers.add_parser("updater", parents=[common_parser]) # moving away from the single letter commands
-    #updater_parser.add_argument("search_artist" , nargs="*", help="induvidual artist names to search for")
     updater_parser.add_argument("-n", "--new", action="store_true", help="only compare against newer albums than is in your collection")
     updater_parser.add_argument("-a", "--all", action="store_true", help="compare against all albums in your collection")
     updater_parser.add_argument("-u", "--update-cache", dest="update_cache", action="store_true", help="update the local cache")
     updater_parser.add_argument("-o", "--only", dest="only", nargs="+", type=str, help="scan for albums from the given artist(s)")
     updater_parser.add_argument("-e", "--excluding", dest="excluding", nargs="+", type=str, help="scan for albums excluding the given artist(s)")
     updater_parser.add_argument("-p", "--print", dest="print_console", action="store_true",help="Outputs missing albums to the console rather than file")
+    updater_parser.add_argument("-r", "--refresh-artist", dest="refresh", nargs=1, type=str, help="refresh a bad artist match")
     updater_parser.set_defaults(command="updater")
     
     args = parser.parse_args()

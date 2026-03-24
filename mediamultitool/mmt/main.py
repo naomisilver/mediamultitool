@@ -1,7 +1,7 @@
 from .cleaner.cleaner import run_cleaner
 from .playlist.import_csv import convert_csv
 from .playlist.import_lastfm import scrape_lastfm_playlist
-from .updater.load_album import get_newest_album
+from .updater.load_album import get_newest_album, fix_artist_match
 
 from .models import PlaylistConfig, UpdaterConfig
 
@@ -50,18 +50,17 @@ def run(args, cfg):
                     print() # probably be handled using a similar method to last.fm with scraping
         
         else:
-            if args.recursive: # will very likely make this defunct in the future, I prefer the idea of multiple inputs
+            #if args.recursive: # will very likely make this defunct in the future, I prefer the idea of multiple inputs
                 # over one input with many potential input files. Depends what this all looks like when i add lastfm, spotify etc...
                 # scraping/api parsing
-                for i in input_params:
-                    csv_files = [x for x in Path(i).iterdir() if x.suffix == ".csv"] # make list of csv files
-                    for csv_file in csv_files:
-                        convert_csv(csv_file, playlist_cfg)
+            #    for i in input_params:
+            #        csv_files = [x for x in Path(i).iterdir() if x.suffix == ".csv"] # make list of csv files
+            #        for csv_file in csv_files:
+            #            convert_csv(csv_file, playlist_cfg)
 
-            else:
-                for i in input_params: # args.input_param now gives a list so iterate through
-                    csv_file_path = Path(i) 
-                    convert_csv(csv_file_path, playlist_cfg)
+            for i in input_params: # args.input_param now gives a list so iterate through
+                csv_file_path = Path(i) 
+                convert_csv(csv_file_path, playlist_cfg)
 
     if args.command == "cleaner":
         dl_path = Path(cfg.cleaner.download_path)
@@ -108,7 +107,11 @@ def run(args, cfg):
             excluded_artists = excluded_list
         )
 
-        get_newest_album(updater_cfg, excluded_list, only_list)
+        if args.refresh:
+            artist_name = [x.lower() for x in args.refresh]
+            fix_artist_match(artist_name)
+        else:
+            get_newest_album(updater_cfg, excluded_list, only_list)
 
     logger.info("Completed in: %s seconds", round(time.time() - start_time, 3))
 

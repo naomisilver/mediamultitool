@@ -267,7 +267,7 @@ class Database:
             "artist_mbid": artist.artist_mbid,
             "title": album["title"],
             "release_type": album["release_type"],
-            "release_year": album["release_year"],
+            "release_date": album["release_date"],
         } for album in artist.albums)
 
         c.executemany("""INSERT OR IGNORE INTO albums (
@@ -277,7 +277,7 @@ class Database:
                       release_type,
                       release_date
                       )
-                      VALUES (:release_group_mbid, :artist_mbid, :title, :release_type, :release_year)
+                      VALUES (:release_group_mbid, :artist_mbid, :title, :release_type, :release_date)
                       """,
                       rows)
         
@@ -285,7 +285,7 @@ class Database:
 
         conn.close()
 
-    def remove_missing(self, a_names: list):
+    def remove(self, a_names: list):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
 

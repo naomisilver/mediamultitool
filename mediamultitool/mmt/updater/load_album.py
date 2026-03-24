@@ -1,6 +1,6 @@
 from ..models import LocalArtist, CachedArtist, UpdaterConfig
 
-from .get_albums import fetch_artist_albums, fetch_artist_mbid
+from .get_albums import fetch_artist_albums, fetch_artist_mbid, fetch_many_artist_mbid
 
 from ..core.normalise import normalise
 from ..core.db import Database
@@ -18,23 +18,10 @@ logger = logging.getLogger(__name__)
 
 """
 TODO:
-    - there's some things to consider like:
-        - allowing the user to search for only the given artists through the cli, e.g., "mmt updater -only blink-182 YOASOBI"
-        - allowing the user to search ignoring the given artists through the cli, e.g., "mmt updater -exlcuding blink-182 YOASOBI"
-        - then in config:
-            - allowing the user to define a list of "always ignore" list so they don't need to repeatedly add the same artists as args
-
-    - downloading is going to be a beast on its own, my absolute best bet would be to look at using streamrip though their "scripting with streamrip" wiki page
-      is woefully lacking, it allows searching using a metadata tag but not sure what that metadata represents, last.fm albumID? qobuz? idk but I could really do
-      with using their search functionality to find it, otherwise I'm kinda boned
+    - Look at a more elegant way to handle user interaction for 'fix_artist_match', I'm going to look into click as an alternative to argparse
+      as it has user input prompts built-in which is nice and then rich as a potential option for stdout. Rich also has progress bars which would spice
+      up the long waits for querying mb. Can replace outputting every found artist for a loading bar showing the most recent downloaded
 """
-
-one_minute_unix_time = 60
-one_hour_unix_time = 3600
-one_day_unix_time = 86400 # somewhat temporary while testing
-one_week_unix_time = 604800
-one_month_unix_time = 2629743
-one_year_unix_time = 31556926
 
 APP_NAME = "mediamultitool"
 APP_DIR = Path(user_config_dir(APP_NAME))
@@ -82,14 +69,13 @@ def get_newest_album(upd_cfg: UpdaterConfig, excluded_list: list, only_list: lis
     artist_data = []
 
     for artist in music_path.iterdir():
+        artist_name = artist.name.lower()
         if only_list:
-            if artist.name.lower() not in only_list:
+            if artist_name not in only_list:
                 continue
 
-        if artist.name.lower() in excluded_list:
+        if artist_name in excluded_list:
             continue # don't want to be attempting to download tracks from various artists, that would 100% bite me in the ass if I did...
-
-        artist_name = artist.name
 
         all_albums = [Path(x).name for x in artist.iterdir()]
 
@@ -157,7 +143,7 @@ def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether
     t = int(time.time())
     
     for local_artist in local_artist_data: # add new if it doesn't exist
-        if not db.is_exists(local_artist.artist_name):
+        if not db.is_exists(local_artist.artist_name.lower()):
 
             mb_artist = fetch_artist_mbid(local_artist.artist_name)
             logger.info("Found artist %s with the mbid: %s", mb_artist.artist_name, mb_artist.artist_mbid)
@@ -180,19 +166,19 @@ def delete_local_missing(upd_cfg: UpdaterConfig, db: Database):
     """ removes artists no longer present in local collection and removes them from local cache """
 
     db_artists = db.retrieve_artist_names()
-    local_artists = [Path(x).name for x in upd_cfg.local_music_path.iterdir()]
+    local_artists = [Path(x).name.lower() for x in upd_cfg.local_music_path.iterdir()]
 
     local_missing = list(set(db_artists) - set(local_artists))
 
     if local_missing:
         logger.info("Found %s missing locally, removing from local cache", len(local_missing))
-        db.remove_missing(local_missing)
+        db.remove(local_missing)
 
 def add_db_missing(upd_cfg: UpdaterConfig, db: Database):
     """ takes new artists in local collection to add to local cache """
 
     db_artists = db.retrieve_artist_names()
-    local_artists = [Path(x).name for x in upd_cfg.local_music_path.iterdir()]
+    local_artists = [Path(x).name.lower() for x in upd_cfg.local_music_path.iterdir()]
 
     db_missing = list(set(local_artists) - set(db_artists))
 
@@ -227,7 +213,7 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
     missing_albums = {}
 
     for local_artist in local_artist_data:
-        db_artist = db.retrieve_albums(local_artist.artist_name)
+        db_artist = db.retrieve_albums(local_artist.artist_name.lower())
 
         for album_type, ignore in upd_cfg.ignore.items():
             if ignore:
@@ -263,6 +249,47 @@ def write_output_to_json(upd_cfg: UpdaterConfig, missing_albums: dict[str: list[
         json.dump(missing_albums, f, indent=4, ensure_ascii=False)
 
     logger.info("Written missing albums to '%s'", json_path)
+
+def fix_artist_match(artist_name: list):
+    """ takes user input on a bad match and presents other potential fixes """
+    
+    db = Database()
+
+    if db.is_exists(''.join(artist_name)): # rather than converting the input list to a string in main, I'm passing the list because remove expects a list and it's messier to convert
+        db_artist = db.retrieve_albums(''.join(artist_name)) # back to a list than it is to convert a single item list to a string
+
+        print("Is this the record you wish to delete and refresh?")
+        print(f"\tArtist_name: {db_artist.artist_name}")
+        print("\tAlbums:")
+        for i in range(5):
+            print(f"\t\t{db_artist.albums[i]['album_title']} | {db_artist.albums[i]['release_type']} | {db_artist.albums[i]['release_date']}")
+
+        artists = {}
+
+        ans = input("(Y/n): ").lower()
+        if ans in ["y", "yes"]:
+            db.remove(artist_name)
+
+            artists = fetch_many_artist_mbid(''.join(artist_name))
+
+            for index, artist in artists.items():
+                artists[index] = fetch_artist_albums(artist)
+                
+            print("The following 5 artists were discovered when rescanning")
+            for index, artist in artists.items():
+                print(f"\t[ {index + 1} ] Artist_name: {artists[index].artist_name}")
+                print(f"\tAlbums:")
+                for i in range (5):
+                    print(f"\t\t{artist.albums[i]['title']} | {artist.albums[i]['release_type']} | {artist.albums[i]['release_date']}")
+
+            print("\nPlease select the number that matches the artist you wish to replace")
+            ans = int(input())
+            db.add(artists[ans - 1])
+
+        else:
+            print("aborted")
+    else:
+        logger.warning("%s does not exist in local cache", str(artist_name))
 
 
 """
