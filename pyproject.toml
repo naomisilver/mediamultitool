@@ -6,7 +6,9 @@ dependencies = [
     "platformdirs",
     "tomlkit",
     "selenium",
-    "requests"
+    "requests",
+    "ratelimit",
+    "rich"
     ]
 description = "A multi-function cli tool to manage self hosted media"
 authors = [{name = "Naomi Silver", email = "naomisilver2002@gmail.com"}]

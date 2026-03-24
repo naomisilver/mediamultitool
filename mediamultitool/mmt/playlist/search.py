@@ -1,7 +1,7 @@
 from ..models import Track, PlaylistConfig
 
 from .create_m3u8 import create_m3u8
-from .normalise import normalise
+from ..core.normalise import normalise
 
 from pathlib import Path
 

@@ -7,4 +7,8 @@ def normalise(s):
     illegal = '<>:"/\\|?*\''
     s = "".join(c for c in s if c not in illegal) # solves the general case of illegal os characters (breaks AC/DC but is solved by discrete artist search)
     s = s.rstrip(".") # solves the case of hkmori's "i just want to be your friend..."
+    s = s.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"') # "holy grail’" vs "holy grail'" this is to catch for musicbrainz entries
+    s = s.replace("…", "...") # "magna carta…" vs "magna carta..." this normalise functions runs twice on every bit of data. Once when imported, and second when it's consumed
+    s = s.replace("‐", "-").replace("-", "-").replace("–", "-").replace("—", "-") # i fucking hate weird unicode additions
+
     return s

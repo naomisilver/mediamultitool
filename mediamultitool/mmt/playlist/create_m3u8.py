@@ -1,4 +1,4 @@
-from .normalise import normalise
+from ..core.normalise import normalise
 
 from pathlib import Path
 

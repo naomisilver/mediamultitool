@@ -1,8 +1,9 @@
 from .cleaner.cleaner import run_cleaner
 from .playlist.import_csv import convert_csv
 from .playlist.import_lastfm import scrape_lastfm_playlist
+from .updater.load_album import get_newest_album, fix_artist_match
 
-from .models import PlaylistConfig
+from .models import PlaylistConfig, UpdaterConfig
 
 from pathlib import Path 
 import logging
@@ -25,10 +26,10 @@ def run(args, cfg):
         if args.output_dir is not None: # stopped defaulting to the input file location as an output because there wouldn't be one for a url, cleans up run slightly too
             output_dir = Path(args.output_dir)
         else:
-            output_dir = Path(cfg.playlist.default_output)
+            output_dir = Path(cfg.core.default_output)
 
         playlist_cfg = PlaylistConfig(
-            local_music_path = Path(cfg.playlist.local_music_path),
+            local_music_path = Path(cfg.core.local_music_path),
             container_root = Path(cfg.playlist.container_root),
             output_path = output_dir,
             lastfm_api_key = cfg.apis.lastfm_api_key,
@@ -49,26 +50,77 @@ def run(args, cfg):
                     print() # probably be handled using a similar method to last.fm with scraping
         
         else:
-            if args.recursive: # will very likely make this defunct in the future, I prefer the idea of multiple inputs
+            #if args.recursive: # will very likely make this defunct in the future, I prefer the idea of multiple inputs
                 # over one input with many potential input files. Depends what this all looks like when i add lastfm, spotify etc...
                 # scraping/api parsing
-                for i in input_params:
-                    csv_files = [x for x in Path(i).iterdir() if x.suffix == ".csv"] # make list of csv files
-                    for csv_file in csv_files:
-                        convert_csv(csv_file, playlist_cfg)
+            #    for i in input_params:
+            #        csv_files = [x for x in Path(i).iterdir() if x.suffix == ".csv"] # make list of csv files
+            #        for csv_file in csv_files:
+            #            convert_csv(csv_file, playlist_cfg)
 
-            else:
-                for i in input_params: # args.input_param now gives a list so iterate through
-                    csv_file_path = Path(i) 
-                    convert_csv(csv_file_path, playlist_cfg)
+            for i in input_params: # args.input_param now gives a list so iterate through
+                csv_file_path = Path(i) 
+                convert_csv(csv_file_path, playlist_cfg)
 
     if args.command == "cleaner":
         dl_path = Path(cfg.cleaner.download_path)
         run_cleaner(dl_path)
 
+    if args.command == "updater":
+
+        all_or_new = (
+            True if args.all
+            else False if args.new
+            else True if cfg.updater.check_new_or_all == "all"
+            else False if cfg.updater.check_new_or_all == "new"
+            else False
+        )
+
+        try:
+            excluded_list = [x.lower() for x in args.excluding]
+        except TypeError:
+            excluded_list = []
+
+        try:
+            only_list = [x.lower() for x in args.only]
+        except TypeError:
+            only_list = []
+
+        split_list = cfg.updater.excluded.split(",")
+        for item in split_list:
+            excluded_list.append(item.lower().strip().rstrip())
+
+        updater_cfg = UpdaterConfig(
+            local_music_path = Path(cfg.core.local_music_path),
+            output_dir = Path(cfg.core.default_output),
+            update_cache = args.update_cache,
+            # all_or_new = True if cfg.updater.check_new_or_all.lower() == "all" else False, # had it inverse but I'd prefer it defaults to new if it isn't explcitly "all"
+            all_or_new = all_or_new,
+            output_to_console = args.print_console,
+            ignore = {
+                "studio_album": cfg.updater.ignore_studio_albums,
+                "ep": cfg.updater.ignore_eps,
+                "single": cfg.updater.ignore_singles,
+                "compilation": cfg.updater.ignore_compilations,
+                "live_album": cfg.updater.ignore_live_albums,
+            },
+            excluded_artists = excluded_list
+        )
+
+        if args.refresh:
+            artist_name = [x.lower() for x in args.refresh]
+            fix_artist_match(artist_name)
+        else:
+            get_newest_album(updater_cfg, excluded_list, only_list)
+
     logger.info("Completed in: %s seconds", round(time.time() - start_time, 3))
 
 """
     Sources/credit:
-        - Time keeping: https://stackoverflow.com/questions/1557571/how-do-i-get-time-of-a-python-programs-execution (not necessary, just thought it'd be cool) 
+        - Time keeping:         https://stackoverflow.com/questions/1557571/how-do-i-get-time-of-a-python-programs-execution (not necessary, just thought it'd be cool) 
+        - Ternary operators:    https://www.geeksforgeeks.org/python/ternary-operator-in-python/ 
+                                https://book.pythontips.com/en/latest/ternary_operators.html
+        - nested ternary op    https://stackoverflow.com/questions/44636514/python-multiple-nested-ternary-expression
+            - the syntax I used was not used here and couldn't find much that specific syntax though most examples are single liners so tried line breaking and it worked so :shrug:
+
 """

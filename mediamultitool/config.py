@@ -24,12 +24,15 @@ class APIKeys:
     lastfm_api_key: str = ''
 
 @dataclass(slots=True)
+class CoreConfig:
+    local_music_path: str = ''
+    default_output: str = ''
+
+@dataclass(slots=True)
 class PlaylistConfig:
     container_root: str = '/music/'
-    local_music_path: str = ''
     blocklist_strings: str = ''
     allowlist_strings: str = ''
-    default_output: str = ''
     artist_aliases: dict[str, str] = field(default_factory=dict)
 
 @dataclass(slots=True)
@@ -37,16 +40,27 @@ class CleanerConfig:
     download_path: str = ''
 
 @dataclass(slots=True)
+class UpdaterConfig:
+    ignore_studio_albums: bool = True
+    ignore_eps: bool = False
+    ignore_singles: bool = False
+    ignore_compilations: bool = False
+    ignore_live_albums: bool = False
+    check_new_or_all: str = ''
+    excluded: str = ''
+
+@dataclass(slots=True)
 class Misc:
-    version: str = '0.1.3'
+    version: str = '0.1.4'
 
 @dataclass(slots=True)
 class AppConfig:
     apis: APIKeys = field(default_factory=APIKeys)
+    core: CoreConfig = field(default_factory=CoreConfig)
     playlist: PlaylistConfig = field(default_factory=PlaylistConfig)
     cleaner: CleanerConfig = field(default_factory=CleanerConfig)
+    updater: UpdaterConfig = field(default_factory=UpdaterConfig)
     misc: Misc = field(default_factory=Misc)
-
 
 def toml_from_config(config) -> tomlkit.items.Table:
     """ create toml table from dataclasses """
