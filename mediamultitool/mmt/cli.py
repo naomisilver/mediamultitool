@@ -13,14 +13,14 @@ import sys
 import webbrowser
 
 """
-TODO:   
+TODO:
     - look at improving console logging by using rich
 """
 
 class CustomFormatter(logging.Formatter):
     grey = "\x1b[38;239m"
     green = "\x1b[38;5;48m"
-    yellow = "\x1b[33;5;222m"
+    yellow = "\x1b[38;5;222m"
     red = "\x1b[31;20m"
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
