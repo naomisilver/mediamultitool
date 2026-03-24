@@ -11,6 +11,8 @@ import os
 import logging
 import sys
 import webbrowser
+import platform
+import subprocess
 
 """
 TODO:
@@ -37,6 +39,20 @@ class CustomFormatter(logging.Formatter):
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt, datefmt="%m/%d/%y %H:%M:%S")
         return formatter.format(record)
+    
+def open_file(path: Path):
+    """ helper to platform agnostically open a given path """
+
+    try:
+        system = platform.system()
+        if system == "Windows":
+            os.startfile(path)
+        elif system == "Darwin":
+            subprocess.run(["open", path], check=True)
+        else:
+            subprocess.run(["xdg-open", path], check=True)
+    except Exception as e:
+        logger.error(f"Failed to open file: {e}")
 
 def validate_input(parser, args, cfg, APP_DIR): # there HAS to be a better way handle induvidual param validation ts getting out of control
     try:
@@ -168,11 +184,11 @@ def mmt():
 
     if args.config:
         print(f"Opening config file at: {APP_DIR / 'config.toml'}", end='')
-        webbrowser.open(f"file:{APP_DIR / 'config.toml'}")
+        open_file(f"{APP_DIR / 'config.toml'}")
         raise SystemExit
     if args.logs:
         print(f"Opening log file at: {LOG_PATH}") 
-        webbrowser.open(LOG_PATH) # **SHOULD** be platform agnostic if not need to look at alternatives (dont have anything apple or none headless Linux system atm)
+        open_file(LOG_PATH) # **SHOULD** be platform agnostic if not need to look at alternatives (dont have anything apple or none headless Linux system atm)
         raise SystemExit
     if args.github:
         print(f"Opening GitHub at: {REPO_LINK}")
@@ -202,4 +218,6 @@ if __name__ == "__main__":
               but when imported will not.
             - TL;DR, mediamultitool run as a user is the parent so I control the logging output and handlers and stuff, when imported,
               it is a child and so the parent program should dictate logging output (though I doubt this'll ever get imported to another proj)
+
+        - platform agnostic file opening: https://stackoverflow.com/questions/434597/open-document-with-default-os-application-in-python-both-in-windows-and-mac-os
 """
