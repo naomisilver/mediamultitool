@@ -12,7 +12,7 @@ import re
 import time
 import os
 import json
-import datetime
+from datetime import datetime, date
 from rich import print, box
 from rich.console import Console
 from rich.table import Table, Column
@@ -65,6 +65,17 @@ def normalise_album(s: str) -> str:
     s = s.replace("-", " ")
 
     return s
+
+def parse_partial_date(s: str) -> date:
+    """ helper to normalise when musicbrainz gives only year or year-month """
+
+    parts = s.split("-")
+
+    year = int(parts[0])
+    month = int(parts[1]) if len(parts) > 1 else 1
+    day = int(parts[2]) if len(parts) > 2 else 1
+
+    return date(year, month, day)
 
 def get_newest_album(upd_cfg: UpdaterConfig, excluded_list: list, only_list: list) -> LocalArtist:
     """ retrieve artists and their latest albums """
@@ -223,7 +234,9 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
             if ignore:
                 continue
 
-            db_items = [album for album in db_artist.albums if album["release_type"] == album_type]
+            d = date.today()
+
+            db_items = [album for album in db_artist.albums if album["release_type"] == album_type and d >= parse_partial_date(album["release_date"])]
 
             missing = compare_albums(upd_cfg, db_items, local_artist)
             if not missing:
@@ -247,7 +260,7 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
 def write_output_to_json(upd_cfg: UpdaterConfig, missing_albums: dict[str: list[str]]):
     """ writes the given dict to json file """
     
-    json_filename = str(datetime.datetime.now())
+    json_filename = str(datetime.now())
     json_path = Path(upd_cfg.output_dir / f"{json_filename[:19]}.json")
     with open(json_path, "w") as f:
         json.dump(missing_albums, f, indent=4, ensure_ascii=False)
@@ -362,4 +375,6 @@ def fix_artist_match(artist_name: list):
 
         - sorting list based on priority:   https://www.geeksforgeeks.org/python/python-sort-list-according-to-other-list-order/
                                             https://stackoverflow.com/questions/4233476/sort-a-list-by-multiple-attributes
+
+        - iso 8601 vs iso 8601:             https://www.influxdata.com/blog/python-date-comparison-comprehensive-tutorial/
 """
