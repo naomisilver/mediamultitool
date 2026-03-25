@@ -15,8 +15,11 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 REPO_LINK = "https://github.com/naomisilver/mediamultitool"
 
-DEFAULT_OUTPUT_DIR = Path(user_documents_dir() + APP_NAME)
+DEFAULT_OUTPUT_DIR = Path(f"{user_documents_dir()}/{APP_NAME}")
 
 def ensure_paths():
     APP_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+def ensure_default_output_path():
+    DEFAULT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
