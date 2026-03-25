@@ -1,4 +1,5 @@
-from platformdirs import user_config_dir
+from .mmt.user_paths import CONFIG_PATH, TEMPLATE_CONFIG_PATH, APP_DIR
+
 from dataclasses import dataclass, field, fields, is_dataclass
 from shutil import copy
 from pathlib import Path
@@ -14,10 +15,6 @@ logger = logging.getLogger(__name__)
     TODO:
         - I want to rewrite this script, I've drawn too heavy of inspiration from streamrip's config file when I need to learn more about toml as an utility
 """
-
-CONFIG_DIR = Path(user_config_dir(APP_NAME))
-TEMPLATE_CONFIG_PATH = Path(__file__).with_name("config.toml")
-CONFIG_FILE = CONFIG_DIR / "config.toml"
 
 @dataclass(slots=True)
 class APIKeys:
@@ -119,10 +116,10 @@ def sync_config_to_toml(toml_section, config) -> bool:
 def load_config() -> AppConfig:
     """ load the config and create if it doesn't exist """
 
-    if not CONFIG_FILE.exists():
-        copy(TEMPLATE_CONFIG_PATH, CONFIG_DIR)
+    if not CONFIG_PATH.exists():
+        copy(TEMPLATE_CONFIG_PATH, APP_DIR)
 
-    doc = tomlkit.parse(CONFIG_FILE.read_text())
+    doc = tomlkit.parse(CONFIG_PATH.read_text())
 
     if "app" not in doc:
         doc["app"] = tomlkit.table()
@@ -132,7 +129,7 @@ def load_config() -> AppConfig:
     cfg = config_from_toml(AppConfig, root)
 
     if sync_config_to_toml(root, cfg):
-        CONFIG_FILE.write_text(tomlkit.dumps(doc))
+        CONFIG_PATH.write_text(tomlkit.dumps(doc))
 
     return cfg
 

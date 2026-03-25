@@ -2,6 +2,7 @@ from .cleaner.cleaner import run_cleaner
 from .playlist.import_csv import convert_csv
 from .playlist.import_lastfm import scrape_lastfm_playlist
 from .updater.load_album import get_newest_album, fix_artist_match
+from .user_paths import DB_PATH, DEFAULT_OUTPUT_DIR, ensure_default_output_path
 
 from .models import PlaylistConfig, UpdaterConfig
 
@@ -19,6 +20,9 @@ def run(args, cfg):
     """ main control function """
     output_provided = False
     start_time = time.time()
+
+    if not cfg.core.default_output:
+        ensure_default_output_path()
 
     if args.command == "playlist":
         input_params = args.input_param 
@@ -92,7 +96,8 @@ def run(args, cfg):
 
         updater_cfg = UpdaterConfig(
             local_music_path = Path(cfg.core.local_music_path),
-            output_dir = Path(cfg.core.default_output),
+            output_dir = Path(cfg.core.default_output) if cfg.core.default_output else DEFAULT_OUTPUT_DIR,
+            db_path = DB_PATH,
             update_cache = args.update_cache,
             # all_or_new = True if cfg.updater.check_new_or_all.lower() == "all" else False, # had it inverse but I'd prefer it defaults to new if it isn't explcitly "all"
             all_or_new = all_or_new,
@@ -107,9 +112,11 @@ def run(args, cfg):
             excluded_artists = excluded_list
         )
 
+        print(updater_cfg.output_dir)
+
         if args.refresh:
             artist_name = [x.lower() for x in args.refresh]
-            fix_artist_match(artist_name)
+            fix_artist_match(artist_name, updater_cfg)
         else:
             get_newest_album(updater_cfg, excluded_list, only_list)
 

@@ -1,9 +1,9 @@
 from .main import run
 from ..config import load_config
+from .user_paths import APP_DIR, LOG_PATH, REPO_LINK, CONFIG_PATH, ensure_paths
 
 from logging.handlers import RotatingFileHandler
 from argparse import ArgumentParser
-from platformdirs import user_config_dir
 from pathlib import Path
 
 import argparse
@@ -55,6 +55,8 @@ def open_file(path: Path):
         logger.error(f"Failed to open file: {e}")
 
 def validate_input(parser, args, cfg, APP_DIR): # there HAS to be a better way handle induvidual param validation ts getting out of control
+    """ validate argsparse inputs """
+
     try:
         if args.command == "playlist":
             if args.input_param is None: # if directory is not provided
@@ -106,12 +108,9 @@ def validate_input(parser, args, cfg, APP_DIR): # there HAS to be a better way h
         pass
 
 def mmt():
-    APP_NAME = "mediamultitool"
-    APP_DIR = Path(user_config_dir(APP_NAME))
-    LOG_DIR = APP_DIR / "logs"
-    LOG_PATH = APP_DIR / "logs" / "mmt.log"
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    REPO_LINK = "https://github.com/naomisilver/mediamultitool"
+    """ mediamultitool entry point """
+
+    ensure_paths()
 
     global logger
 
@@ -184,7 +183,7 @@ def mmt():
 
     if args.config:
         print(f"Opening config file at: {APP_DIR / 'config.toml'}", end='')
-        open_file(f"{APP_DIR / 'config.toml'}")
+        open_file(f"{CONFIG_PATH}")
         raise SystemExit
     if args.logs:
         print(f"Opening log file at: {LOG_PATH}") 

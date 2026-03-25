@@ -36,6 +36,7 @@ class PlaylistConfig:
 class UpdaterConfig: # small now but will make things easier if I do move to automatic downloading via streamrip
     local_music_path: Path
     output_dir: Path
+    db_path: Path
     update_cache: bool
     all_or_new: bool
     output_to_console: bool = False
