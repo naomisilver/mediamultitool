@@ -1,4 +1,5 @@
-from ..models import LocalArtist, CachedArtist, UpdaterConfig
+from ..core.models import LocalArtist, CachedArtist, UpdaterConfig
+from ..core.richui import RichUI 
 
 from .get_albums import fetch_artist_albums, fetch_artist_mbid, fetch_many_artist_mbid
 
@@ -17,6 +18,7 @@ from rich import print, box
 from rich.console import Console
 from rich.table import Table, Column
 from rich.prompt import Prompt
+from rich.live import Live
 
 logger = logging.getLogger(__name__)
 
@@ -146,19 +148,37 @@ def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalAr
 
         return missing
     
+def make_table(rows):
+    table = Table()
+    table.add_column("Artist name")
+    table.add_column("MBID")
+
+    for r in rows:
+        table.add_row(*r)
+
+    return table
+
 def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether I should include this here or move to a seperate file, will sleep on it
     """ scans local collection, and updates local cache, based on existance/last_checked, from musicbrainz """
     
+    ui = RichUI()
+    index = 1
+
     t = int(time.time())
     
     for local_artist in local_artist_data: # add new if it doesn't exist
         if not db.is_exists(local_artist.artist_name.lower()):
 
             mb_artist = fetch_artist_mbid(local_artist.artist_name)
-            logger.info("Found artist %s with the mbid: %s", mb_artist.artist_name, mb_artist.artist_mbid)
+            logger.debug("Found artist %s with the mbid: %s", mb_artist.artist_name, mb_artist.artist_mbid)
 
             mb_artist = fetch_artist_albums(mb_artist)
-            logger.info("Found %s albums for artist: %s", len(mb_artist.albums), mb_artist.artist_name)
+            logger.debug("Found %s albums for artist: %s", len(mb_artist.albums), mb_artist.artist_name)
+
+            total = len(local_artist_data)
+            index = index + 1
+            count = f"{index}/{total}"
+            ui.artist_albums_updated(mb_artist, count)
 
             db.add(mb_artist)
 
@@ -167,7 +187,10 @@ def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether
 
         updated_a = fetch_artist_albums(stale_a)
 
-        logger.info("Updated artist: %s", updated_a.artist_name)
+        total = len(stale_artists)
+        index = index + 1
+        count = f"{index}/{total}"
+        ui.artist_albums_updated(updated_a, count)
 
         db.add(updated_a)
 
@@ -334,7 +357,7 @@ def fix_artist_match(artist_name: list, upd_cfg: UpdaterConfig):
                 count = 0
                 sorted_albums = sorted(artists[index].albums, key=lambda album: (priority.get(album['release_type'], 99), album['release_date']), reverse=True)
                 for album in sorted_albums:
-                    truncated_album = (album['title'][:57] + '..' if len(album['title']) > 59 else album['title'])
+                    truncated_album = (album['album_title'][:57] + '..' if len(album['album_title']) > 59 else album['album_title'])
                     table.add_row(truncated_album, album['release_type'], album['release_date'])
                     count = count + 1
                     if count == 5:

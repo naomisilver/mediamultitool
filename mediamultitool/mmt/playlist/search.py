@@ -1,4 +1,4 @@
-from ..models import Track, PlaylistConfig
+from ..core.models import Track, PlaylistConfig
 
 from .create_m3u8 import create_m3u8
 from ..core.normalise import normalise

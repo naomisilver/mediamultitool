@@ -1,4 +1,4 @@
-from ..models import Track, PlaylistConfig
+from ..core.models import Track, PlaylistConfig
 from .search import search_music
 
 from selenium import webdriver

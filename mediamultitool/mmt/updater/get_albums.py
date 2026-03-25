@@ -1,4 +1,4 @@
-from ..models import LocalArtist, CachedArtist, UpdaterConfig
+from ..core.models import LocalArtist, CachedArtist, UpdaterConfig
 
 from ..core.db import Database
 
@@ -188,12 +188,12 @@ def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
                 if rg["primary-type"].lower() == "single": # singles also include singles of tracks later released in an actual album, again, idrk if I can do someting
                     # about that as some artists will release singles and NOT later release them as part of an album which is the use case I'm trying to capture
                     #artist.singles.append(f"{normalise(title)} ({release_date})")
-                    artist.albums.append({"release_group_mbid": release_group_mbid, "title": f"{normalise(title)}", "release_date": release_date, "release_type": "single"})
+                    artist.albums.append({"release_group_mbid": release_group_mbid, "album_title": f"{normalise(title)}", "release_date": release_date, "release_type": "single"})
 
                 if rg["primary-type"].lower() == "ep": # some eps seem to be seen as studio albums from musicbrainz and idrk if I can do anything about that
                     # and it seems to include "sessions" like aol and shit, will look into if I can set a param to ignore them
                     #artist.eps.append(f"{normalise(title)} ({release_date})")
-                    artist.albums.append({"release_group_mbid": release_group_mbid, "title": f"{normalise(title)}", "release_date": release_date, "release_type": "ep"})
+                    artist.albums.append({"release_group_mbid": release_group_mbid, "album_title": f"{normalise(title)}", "release_date": release_date, "release_type": "ep"})
                 
                 continue # the messy appends NEED to be sorted, I'm just deadass repeating the same append statement 5 times, im too tired to sort that, I just need to test
             # my new database/database methods
@@ -202,13 +202,13 @@ def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
                 for st in rg["secondary-types"]:
                     if "live" in st.lower():
                         #artist.live_albums.append(f"{normalise(title)} ({release_date})")
-                        artist.albums.append({"release_group_mbid": release_group_mbid, "title": f"{normalise(title)}", "release_date": release_date, "release_type": "live_album"})
+                        artist.albums.append({"release_group_mbid": release_group_mbid, "album_title": f"{normalise(title)}", "release_date": release_date, "release_type": "live_album"})
                     if "compilation" in st.lower():
                         #artist.compilations.append(f"{normalise(title)} ({release_date})")
-                        artist.albums.append({"release_group_mbid": release_group_mbid, "title": f"{normalise(title)}", "release_date": release_date, "release_type": "compilation"})
+                        artist.albums.append({"release_group_mbid": release_group_mbid, "album_title": f"{normalise(title)}", "release_date": release_date, "release_type": "compilation"})
 
             except KeyError:
-                artist.albums.append({"release_group_mbid": release_group_mbid, "title": f"{normalise(title)}", "release_date": release_date, "release_type": "studio_album"})
+                artist.albums.append({"release_group_mbid": release_group_mbid, "album_title": f"{normalise(title)}", "release_date": release_date, "release_type": "studio_album"})
 
         count = data["count"] # if the count value indicating the amount of results isn't present, break after the first cycle as theres no pages to ination XD
         if count is None:
