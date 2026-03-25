@@ -16,12 +16,6 @@ one_hour_unix_time = 3600
 one_day_unix_time = 86400 # somewhat temporary while testing
 one_week_unix_time = 604800
 
-APP_NAME = "mediamultitool"
-APP_DIR = Path(user_config_dir(APP_NAME))
-LOG_DIR = APP_DIR / "logs" # copy pasted from cli.py with the added DB_PATH, will be moving to paths.py in a later issue/commit
-LOG_PATH = APP_DIR / "logs" / "mmt.log"
-DB_PATH = APP_DIR / "updater.db"
-
 """
     TODO:
         - I really need to find a way to condense these methods, I'm repeating the same steps and espc for db.add(), docstrings as part of a callable should be illegal
@@ -34,8 +28,8 @@ DB_PATH = APP_DIR / "updater.db"
 """
 
 class Database:
-    def __init__(self):
-        self.db_path = DB_PATH # will be moving to a "paths.py" script to be able to import each respective path
+    def __init__(self, db_path):
+        self.db_path = db_path # will be moving to a "paths.py" script to be able to import each respective path
         # for now, this is the way it is
 
         if not os.path.exists(self.db_path): # means it will always make itself on first run of updater

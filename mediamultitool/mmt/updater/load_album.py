@@ -27,12 +27,6 @@ TODO:
       up the long waits for querying mb. Can replace outputting every found artist for a loading bar showing the most recent downloaded
 """
 
-APP_NAME = "mediamultitool"
-APP_DIR = Path(user_config_dir(APP_NAME))
-LOG_DIR = APP_DIR / "logs" # copy pasted from cli.py with the added DB_PATH, will be moving to paths.py in a later issue/commit but needed to check for db existing
-LOG_PATH = APP_DIR / "logs" / "mmt.log"
-DB_PATH = APP_DIR / "updater.db"
-
 def regex_tag_check(s: str) -> int:
     """ helper to find the release year of a given album """
 
@@ -209,7 +203,7 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
         will get moved to a "pipeline" method when the modules get turned into classes
     """
 
-    db = Database()
+    db = Database(upd_cfg.db_path)
 
     delete_local_missing(upd_cfg, db) # happen before updating so its not querying mb for soon to be deleted data
 
@@ -219,7 +213,7 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
     
     if upd_cfg.update_cache or add_db_missing(upd_cfg, db): # this can be done better when I move each module to a class, this can be called/run the require logic from main
         update_cache(local_artist_data, db)
-    elif os.path.isfile(DB_PATH):
+    elif os.path.isfile(upd_cfg.db_path):
         pass
     else:
         logger.error("The local cache has not yet been created, please run 'mmt updater -update-cache to generate cache")
@@ -267,10 +261,10 @@ def write_output_to_json(upd_cfg: UpdaterConfig, missing_albums: dict[str: list[
 
     logger.info("Written missing albums to '%s'", json_path)
 
-def fix_artist_match(artist_name: list):
+def fix_artist_match(artist_name: list, upd_cfg: UpdaterConfig):
     """ takes user input on a bad match and presents other potential fixes """
     
-    db = Database()
+    db = Database(upd_cfg.db_path)
     con = Console()
 
     priority = {
