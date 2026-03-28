@@ -30,7 +30,7 @@ def run(args, cfg):
         if args.output_dir is not None: # stopped defaulting to the input file location as an output because there wouldn't be one for a url, cleans up run slightly too
             output_dir = Path(args.output_dir)
         else:
-            output_dir = Path(cfg.core.default_output)
+            output_dir = Path(cfg.core.default_output) if cfg.core.default_output else DEFAULT_OUTPUT_DIR
 
         playlist_cfg = PlaylistConfig(
             local_music_path = Path(cfg.core.local_music_path),

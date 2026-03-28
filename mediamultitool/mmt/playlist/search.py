@@ -1,4 +1,5 @@
 from ..core.models import Track, PlaylistConfig
+from ..core.richui import RichUI
 
 from .create_m3u8 import create_m3u8
 from ..core.normalise import normalise
@@ -43,11 +44,14 @@ def get_container_path(track_paths, music_path, pl_cfg):
     return container_paths
 
 
-def search_music(tracks, pl_cfg: object, playlist_name):
+def search_music(tracks: list[Track], pl_cfg: object, playlist_name):
     """ iterate tracks and search for the tracks in local storage """
     allowlist_strs = pl_cfg.allowlist_strs
     blocklist_strs = pl_cfg.blocklist_strs
     music_path = pl_cfg.local_music_path
+
+    ui = RichUI()
+    ui.start()
 
     missing_tracks = 0
     full_path_list = []
@@ -104,7 +108,8 @@ def search_music(tracks, pl_cfg: object, playlist_name):
         
         if artist_path == None:
             missing_tracks += 1
-            logger.warning("Artist not found for: %s/%s/%s", t.artist, t.album, t.track.strip())
+            logger.debug("Artist not found for: %s/%s/%s", t.artist, t.album, t.track.strip())
+            ui.playlist_missing_tracks(t.artist, t.album, t.track.strip())
             continue
 
         # album matching
@@ -151,14 +156,18 @@ def search_music(tracks, pl_cfg: object, playlist_name):
             # but raw shows: "SPAGHETTI (Member ver.)", it wouldn't match with exact string matching. Might need to bite the bullet and use regex *shudder*
             if normalise(raw_track) in normalise(track_name) and not blocklist:
                 track_path = track.resolve()
-                logger.info("Found track: %s ", track.name)
+                logger.debug("Found track: %s ", track.name)
+                ui.playlist_matching_tracks(track.name)
                 full_path_list.append(track_path)
 
                 break
             
         else:
             missing_tracks += 1
-            logger.warning("Track not found for: %s/%s/%s", t.artist, t.album, t.track.strip())
+            logger.debug("Track not found for: %s/%s/%s", t.artist, t.album, t.track.strip())
+            ui.playlist_missing_tracks(t.artist, t.album, t.track.strip())
+
+    ui.stop()
 
     if missing_tracks > 0: 
         logger.warning("Number of missing tracks or albums: %s/%s", missing_tracks, missing_tracks + len(full_path_list))

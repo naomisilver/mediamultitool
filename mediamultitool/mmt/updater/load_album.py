@@ -147,21 +147,13 @@ def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalAr
                 missing.append(f"{item['album_title']} ({db_year})")
 
         return missing
-    
-def make_table(rows):
-    table = Table()
-    table.add_column("Artist name")
-    table.add_column("MBID")
-
-    for r in rows:
-        table.add_row(*r)
-
-    return table
 
 def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether I should include this here or move to a seperate file, will sleep on it
     """ scans local collection, and updates local cache, based on existance/last_checked, from musicbrainz """
     
     ui = RichUI()
+    ui.start()
+
     index = 1
 
     t = int(time.time())
@@ -180,6 +172,8 @@ def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether
             count = f"{index}/{total}"
             ui.artist_albums_updated(mb_artist, count)
 
+            print("\nWORLD HELLO")
+
             db.add(mb_artist)
 
     stale_artists = db.is_stale()
@@ -191,6 +185,8 @@ def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether
         index = index + 1
         count = f"{index}/{total}"
         ui.artist_albums_updated(updated_a, count)
+
+        print("\nHELLO WORLD")
 
         db.add(updated_a)
 
@@ -290,47 +286,17 @@ def fix_artist_match(artist_name: list, upd_cfg: UpdaterConfig):
     db = Database(upd_cfg.db_path)
     con = Console()
 
-    priority = {
-        "studio_album": 4,
-        "ep": 3, # reverse order as my dates are iso 8601 format and have to reverse them to get studio album > ep > single with most recent first
-        "single": 2,
-        "compilation": 1,
-        "live_album": 0,
-
-    }
+    ui = RichUI()
+    ui.start()
 
     if db.is_exists(''.join(artist_name)): # rather than converting the input list to a string in main, I'm passing the list because remove expects a list and it's messier to convert
         db_artist = db.retrieve_albums(''.join(artist_name)) # back to a list than it is to convert a single item list to a string
 
-        table = Table(
-            Column("Title", style="green", width=60),
-            Column("Release Type", style="green", width=20),
-            Column(header="Release Date", style="green", width=20),
-            box=box.ROUNDED,
-            safe_box=True,
-            width=100,
-            row_styles=["dim", ""],
-            title_style="green"
-        )
-
-        sorted_albums = sorted(db_artist.albums, key=lambda album: (priority.get(album['release_type'], 99), album['release_date']), reverse=True)
-
-        table.title = db_artist.artist_name
-        
-        count = 0
-        #studio_albums = [album for album in db_artist.albums if album['release_type'] == "studio_album"]
-        for album in sorted_albums:
-            truncated_album = (album['album_title'][:53] + '..' if len(album['album_title']) > 55 else album['album_title'])
-            table.add_row(truncated_album, album['release_type'], album['release_date'])
-            count = count + 1
-            if count == 5:
-                break
-
-        con.print(table)
+        ui.static_artist_details(db_artist)
 
         artists = {}
-
-        ans = Prompt.ask("[bold green]Is this the record you wish to delete and refresh? [Y/n][/bold green]").lower()
+        
+        ans = ui.ask("[bold green]Is this the record you wish to delete and refresh? [Y/n][/bold green]").lower()
         if ans in ["y", "yes"]:
             db.remove(artist_name)
 
@@ -339,31 +305,9 @@ def fix_artist_match(artist_name: list, upd_cfg: UpdaterConfig):
             for index, artist in artists.items():
                 artists[index] = fetch_artist_albums(artist)
                 
-            #print("[bold green]The following 5 artists were discovered when rescanning[/bold green]")
-            for index, artist in artists.items():
-                table = Table(
-                    Column("Title", style="green", width=60),
-                    Column("Release Type", style="green", width=20),
-                    Column(header="Release Date", style="green", width=20),
-                    box=box.ROUNDED,
-                    safe_box=True,
-                    width=100,
-                    row_styles=["dim", ""],
-                    title_style="green"
-                )
-
-                table.title = f"[{index + 1}] {artist.artist_name}"
-
-                count = 0
-                sorted_albums = sorted(artists[index].albums, key=lambda album: (priority.get(album['release_type'], 99), album['release_date']), reverse=True)
-                for album in sorted_albums:
-                    truncated_album = (album['album_title'][:57] + '..' if len(album['album_title']) > 59 else album['album_title'])
-                    table.add_row(truncated_album, album['release_type'], album['release_date'])
-                    count = count + 1
-                    if count == 5:
-                        break
-
-                con.print(table)
+            """
+                THIS IS WHERE PROMPT TOOLKIT WILL GO
+            """
 
             ans = Prompt.ask("[bold green]Please select the number that matches the artist you wish to replace [1, 2, 3, 4, 5][/bold green]")
             ans = int(ans)

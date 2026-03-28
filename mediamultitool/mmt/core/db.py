@@ -135,7 +135,7 @@ class Database:
                   FROM artists 
                   LEFT JOIN albums 
                   ON artists.artist_mbid = albums.artist_mbid 
-                  WHERE (? - last_checked) > ?""", (t, 1))
+                  WHERE (? - last_checked) > ?""", (t, one_week_unix_time))
 
         rows = c.fetchall()
 
