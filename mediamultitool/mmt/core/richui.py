@@ -242,3 +242,12 @@ class RichUI:
 
             self.missing_albums.append((truncated_artist, truncated_album, album_type))
             self.refresh()
+
+"""
+    - kwargs, interesting and going to be extremely useful: https://stackoverflow.com/questions/1769403/what-is-the-purpose-and-use-of-kwargs#:~:text=You%20can%20use%20**kwargs,passed%20to%20the%20function%20
+    - rich:     https://rich.readthedocs.io/en/latest/tables.html
+        - rich is awesome omg
+
+    - sorting list based on priority:   https://www.geeksforgeeks.org/python/python-sort-list-according-to-other-list-order/
+                                        https://stackoverflow.com/questions/4233476/sort-a-list-by-multiple-attributes
+"""

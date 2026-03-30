@@ -339,11 +339,5 @@ def fix_artist_match(artist_name: list, upd_cfg: UpdaterConfig):
         - not converting unicode to unicode escape sequences: https://docs.python.org/3/library/json.html
             - kinda sucks when you're dealing with cyrillic, japanese etc... album names
 
-        - rich:     https://rich.readthedocs.io/en/latest/tables.html
-            - rich is awesome omg
-
-        - sorting list based on priority:   https://www.geeksforgeeks.org/python/python-sort-list-according-to-other-list-order/
-                                            https://stackoverflow.com/questions/4233476/sort-a-list-by-multiple-attributes
-
         - iso 8601 vs iso 8601:             https://www.influxdata.com/blog/python-date-comparison-comprehensive-tutorial/
 """
