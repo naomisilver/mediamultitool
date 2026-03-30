@@ -172,8 +172,6 @@ def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether
             count = f"{index}/{total}"
             ui.artist_albums_updated(mb_artist, count)
 
-            print("\nWORLD HELLO")
-
             db.add(mb_artist)
 
     stale_artists = db.is_stale()
@@ -186,9 +184,9 @@ def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether
         count = f"{index}/{total}"
         ui.artist_albums_updated(updated_a, count)
 
-        print("\nHELLO WORLD")
-
         db.add(updated_a)
+
+    ui.stop()
 
 def delete_local_missing(upd_cfg: UpdaterConfig, db: Database):
     """ removes artists no longer present in local collection and removes them from local cache """
@@ -209,6 +207,7 @@ def add_db_missing(upd_cfg: UpdaterConfig, db: Database):
     local_artists = [Path(x).name.lower() for x in upd_cfg.local_music_path.iterdir()]
 
     db_missing = list(set(local_artists) - set(db_artists))
+    db_missing = set(db_missing) - set(upd_cfg.excluded_artists) # it wouldn't exclude the artists defined in config otherwise
 
     if db_missing:
         logger.info("Found %s new artists, updating local cache", len(db_missing))
@@ -223,6 +222,8 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
     """
 
     db = Database(upd_cfg.db_path)
+    ui = RichUI()
+    ui.start()
 
     delete_local_missing(upd_cfg, db) # happen before updating so its not querying mb for soon to be deleted data
 
@@ -255,17 +256,21 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
             if not missing:
                 continue
 
-            missing_albums[local_artist.artist_name] = {}
-            missing_albums[local_artist.artist_name][f"{album_type}s"] = missing
+            missing_albums[local_artist.artist_name] = {} # only used in writing to a json file, kind of a stopgap until downloading is implemented
+            missing_albums[local_artist.artist_name][f"{album_type}s"] = missing # then -d/--download would output the small table and write the json file
+            # downloader.py would then take over, using the most recent json file as the stock to download from
 
             if upd_cfg.output_to_console:
-                logger.warning("Missing %s %ss for artist %s: %s", len(missing), album_type, local_artist.artist_name, missing)
+                logger.debug("Missing %s %ss for artist %s: %s", len(missing), album_type, local_artist.artist_name, missing)
+                ui.updater_missing_albums_all(local_artist.artist_name, missing, album_type)
+            # a quirk of this implementation is that when printing the missing table with more than one album type not ignored (e.g., studio_albums and eps)
+            # it outputs both as induvidual rows and I think that is the best way, that way it's clear that I'm mising say 1 studio album from the rolling stones
+            # and 136 eps rather than it appearing as i'm missing 137 albums total (that's a real comparison, what were the rolling stones smoking)
+            else:
+                logger.debug("Missing %s %ss for artist %s: %s", len(missing), album_type, local_artist.artist_name, missing)
+                ui.updater_missing_albums_one(local_artist.artist_name, missing, album_type)
 
-            elif len(missing) <= 2:
-                logger.warning("Missing %s %ss for artist %s: %s", len(missing), album_type, local_artist.artist_name, missing)
-
-            elif len(missing) > 2:
-                logger.warning("Missing %s %ss for artist %s: %s + %s more", len(missing), album_type, local_artist.artist_name, missing[:2], len(missing) - 2)
+    ui.stop()
 
     if not upd_cfg.output_to_console:
         write_output_to_json(upd_cfg, missing_albums)
@@ -293,8 +298,11 @@ def fix_artist_match(artist_name: list, upd_cfg: UpdaterConfig):
         db_artist = db.retrieve_albums(''.join(artist_name)) # back to a list than it is to convert a single item list to a string
 
         ui.static_artist_details(db_artist)
+        ui.stop()
 
         artists = {}
+
+        ui.artist_rows = []
         
         ans = ui.ask("[bold green]Is this the record you wish to delete and refresh? [Y/n][/bold green]").lower()
         if ans in ["y", "yes"]:
@@ -304,12 +312,12 @@ def fix_artist_match(artist_name: list, upd_cfg: UpdaterConfig):
 
             for index, artist in artists.items():
                 artists[index] = fetch_artist_albums(artist)
-                
-            """
-                THIS IS WHERE PROMPT TOOLKIT WILL GO
-            """
 
-            ans = Prompt.ask("[bold green]Please select the number that matches the artist you wish to replace [1, 2, 3, 4, 5][/bold green]")
+                ui.start() # not exactly elegant but because i use live to render my tables, when trying to print without explicitly starting and
+                ui.static_artist_details(artists[index], f"[{index + 1}] {artists[index].artist_name}") # stopping the live rendering, the "is this right" table would prevent rendering the next tables
+                ui.stop() # I *could* completely refactor richui to handles this automatically but i fear adding 3 method calls is far easier and simpler
+
+            ans = ui.ask("[bold green]Please select the number that matches the artist you wish to replace [1-5][/bold green]")
             ans = int(ans)
             db.add(artists[ans - 1])
 
