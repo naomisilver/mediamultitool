@@ -1,4 +1,4 @@
-from ..models import Track # track class
+from ..core.models import Track # track class
 
 from .search import search_music
 

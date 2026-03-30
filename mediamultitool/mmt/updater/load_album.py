@@ -1,4 +1,5 @@
-from ..models import LocalArtist, CachedArtist, UpdaterConfig
+from ..core.models import LocalArtist, CachedArtist, UpdaterConfig
+from ..core.richui import RichUI 
 
 from .get_albums import fetch_artist_albums, fetch_artist_mbid, fetch_many_artist_mbid
 
@@ -17,6 +18,7 @@ from rich import print, box
 from rich.console import Console
 from rich.table import Table, Column
 from rich.prompt import Prompt
+from rich.live import Live
 
 logger = logging.getLogger(__name__)
 
@@ -145,20 +147,30 @@ def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalAr
                 missing.append(f"{item['album_title']} ({db_year})")
 
         return missing
-    
+
 def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether I should include this here or move to a seperate file, will sleep on it
     """ scans local collection, and updates local cache, based on existance/last_checked, from musicbrainz """
     
+    ui = RichUI()
+    ui.start()
+
+    index = 1
+
     t = int(time.time())
     
     for local_artist in local_artist_data: # add new if it doesn't exist
         if not db.is_exists(local_artist.artist_name.lower()):
 
             mb_artist = fetch_artist_mbid(local_artist.artist_name)
-            logger.info("Found artist %s with the mbid: %s", mb_artist.artist_name, mb_artist.artist_mbid)
+            logger.debug("Found artist %s with the mbid: %s", mb_artist.artist_name, mb_artist.artist_mbid)
 
             mb_artist = fetch_artist_albums(mb_artist)
-            logger.info("Found %s albums for artist: %s", len(mb_artist.albums), mb_artist.artist_name)
+            logger.debug("Found %s albums for artist: %s", len(mb_artist.albums), mb_artist.artist_name)
+
+            total = len(local_artist_data)
+            index = index + 1
+            count = f"{index}/{total}"
+            ui.artist_albums_updated(mb_artist, count)
 
             db.add(mb_artist)
 
@@ -167,9 +179,14 @@ def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether
 
         updated_a = fetch_artist_albums(stale_a)
 
-        logger.info("Updated artist: %s", updated_a.artist_name)
+        total = len(stale_artists)
+        index = index + 1
+        count = f"{index}/{total}"
+        ui.artist_albums_updated(updated_a, count)
 
         db.add(updated_a)
+
+    ui.stop()
 
 def delete_local_missing(upd_cfg: UpdaterConfig, db: Database):
     """ removes artists no longer present in local collection and removes them from local cache """
@@ -190,6 +207,7 @@ def add_db_missing(upd_cfg: UpdaterConfig, db: Database):
     local_artists = [Path(x).name.lower() for x in upd_cfg.local_music_path.iterdir()]
 
     db_missing = list(set(local_artists) - set(db_artists))
+    db_missing = set(db_missing) - set(upd_cfg.excluded_artists) # it wouldn't exclude the artists defined in config otherwise
 
     if db_missing:
         logger.info("Found %s new artists, updating local cache", len(db_missing))
@@ -204,6 +222,8 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
     """
 
     db = Database(upd_cfg.db_path)
+    ui = RichUI()
+    ui.start()
 
     delete_local_missing(upd_cfg, db) # happen before updating so its not querying mb for soon to be deleted data
 
@@ -236,17 +256,21 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
             if not missing:
                 continue
 
-            missing_albums[local_artist.artist_name] = {}
-            missing_albums[local_artist.artist_name][f"{album_type}s"] = missing
+            missing_albums[local_artist.artist_name] = {} # only used in writing to a json file, kind of a stopgap until downloading is implemented
+            missing_albums[local_artist.artist_name][f"{album_type}s"] = missing # then -d/--download would output the small table and write the json file
+            # downloader.py would then take over, using the most recent json file as the stock to download from
 
             if upd_cfg.output_to_console:
-                logger.warning("Missing %s %ss for artist %s: %s", len(missing), album_type, local_artist.artist_name, missing)
+                logger.debug("Missing %s %ss for artist %s: %s", len(missing), album_type, local_artist.artist_name, missing)
+                ui.updater_missing_albums_all(local_artist.artist_name, missing, album_type)
+            # a quirk of this implementation is that when printing the missing table with more than one album type not ignored (e.g., studio_albums and eps)
+            # it outputs both as induvidual rows and I think that is the best way, that way it's clear that I'm mising say 1 studio album from the rolling stones
+            # and 136 eps rather than it appearing as i'm missing 137 albums total (that's a real comparison, what were the rolling stones smoking)
+            else:
+                logger.debug("Missing %s %ss for artist %s: %s", len(missing), album_type, local_artist.artist_name, missing)
+                ui.updater_missing_albums_one(local_artist.artist_name, missing, album_type)
 
-            elif len(missing) <= 2:
-                logger.warning("Missing %s %ss for artist %s: %s", len(missing), album_type, local_artist.artist_name, missing)
-
-            elif len(missing) > 2:
-                logger.warning("Missing %s %ss for artist %s: %s + %s more", len(missing), album_type, local_artist.artist_name, missing[:2], len(missing) - 2)
+    ui.stop()
 
     if not upd_cfg.output_to_console:
         write_output_to_json(upd_cfg, missing_albums)
@@ -267,47 +291,20 @@ def fix_artist_match(artist_name: list, upd_cfg: UpdaterConfig):
     db = Database(upd_cfg.db_path)
     con = Console()
 
-    priority = {
-        "studio_album": 4,
-        "ep": 3, # reverse order as my dates are iso 8601 format and have to reverse them to get studio album > ep > single with most recent first
-        "single": 2,
-        "compilation": 1,
-        "live_album": 0,
-
-    }
+    ui = RichUI()
+    ui.start()
 
     if db.is_exists(''.join(artist_name)): # rather than converting the input list to a string in main, I'm passing the list because remove expects a list and it's messier to convert
         db_artist = db.retrieve_albums(''.join(artist_name)) # back to a list than it is to convert a single item list to a string
 
-        table = Table(
-            Column("Title", style="green", width=60),
-            Column("Release Type", style="green", width=20),
-            Column(header="Release Date", style="green", width=20),
-            box=box.ROUNDED,
-            safe_box=True,
-            width=100,
-            row_styles=["dim", ""],
-            title_style="green"
-        )
-
-        sorted_albums = sorted(db_artist.albums, key=lambda album: (priority.get(album['release_type'], 99), album['release_date']), reverse=True)
-
-        table.title = db_artist.artist_name
-        
-        count = 0
-        #studio_albums = [album for album in db_artist.albums if album['release_type'] == "studio_album"]
-        for album in sorted_albums:
-            truncated_album = (album['album_title'][:53] + '..' if len(album['album_title']) > 55 else album['album_title'])
-            table.add_row(truncated_album, album['release_type'], album['release_date'])
-            count = count + 1
-            if count == 5:
-                break
-
-        con.print(table)
+        ui.static_artist_details(db_artist)
+        ui.stop()
 
         artists = {}
 
-        ans = Prompt.ask("[bold green]Is this the record you wish to delete and refresh? [Y/n][/bold green]").lower()
+        ui.artist_rows = []
+        
+        ans = ui.ask("[bold green]Is this the record you wish to delete and refresh? [Y/n][/bold green]").lower()
         if ans in ["y", "yes"]:
             db.remove(artist_name)
 
@@ -315,34 +312,12 @@ def fix_artist_match(artist_name: list, upd_cfg: UpdaterConfig):
 
             for index, artist in artists.items():
                 artists[index] = fetch_artist_albums(artist)
-                
-            #print("[bold green]The following 5 artists were discovered when rescanning[/bold green]")
-            for index, artist in artists.items():
-                table = Table(
-                    Column("Title", style="green", width=60),
-                    Column("Release Type", style="green", width=20),
-                    Column(header="Release Date", style="green", width=20),
-                    box=box.ROUNDED,
-                    safe_box=True,
-                    width=100,
-                    row_styles=["dim", ""],
-                    title_style="green"
-                )
 
-                table.title = f"[{index + 1}] {artist.artist_name}"
+                ui.start() # not exactly elegant but because i use live to render my tables, when trying to print without explicitly starting and
+                ui.static_artist_details(artists[index], f"[{index + 1}] {artists[index].artist_name}") # stopping the live rendering, the "is this right" table would prevent rendering the next tables
+                ui.stop() # I *could* completely refactor richui to handles this automatically but i fear adding 3 method calls is far easier and simpler
 
-                count = 0
-                sorted_albums = sorted(artists[index].albums, key=lambda album: (priority.get(album['release_type'], 99), album['release_date']), reverse=True)
-                for album in sorted_albums:
-                    truncated_album = (album['title'][:57] + '..' if len(album['title']) > 59 else album['title'])
-                    table.add_row(truncated_album, album['release_type'], album['release_date'])
-                    count = count + 1
-                    if count == 5:
-                        break
-
-                con.print(table)
-
-            ans = Prompt.ask("[bold green]Please select the number that matches the artist you wish to replace [1, 2, 3, 4, 5][/bold green]")
+            ans = ui.ask("[bold green]Please select the number that matches the artist you wish to replace [1-5][/bold green]")
             ans = int(ans)
             db.add(artists[ans - 1])
 
@@ -363,12 +338,6 @@ def fix_artist_match(artist_name: list, upd_cfg: UpdaterConfig):
 
         - not converting unicode to unicode escape sequences: https://docs.python.org/3/library/json.html
             - kinda sucks when you're dealing with cyrillic, japanese etc... album names
-
-        - rich:     https://rich.readthedocs.io/en/latest/tables.html
-            - rich is awesome omg
-
-        - sorting list based on priority:   https://www.geeksforgeeks.org/python/python-sort-list-according-to-other-list-order/
-                                            https://stackoverflow.com/questions/4233476/sort-a-list-by-multiple-attributes
 
         - iso 8601 vs iso 8601:             https://www.influxdata.com/blog/python-date-comparison-comprehensive-tutorial/
 """

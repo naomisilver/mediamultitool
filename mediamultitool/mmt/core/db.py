@@ -1,4 +1,4 @@
-from ..models import CachedArtist, LocalArtist
+from .models import CachedArtist, LocalArtist
 
 from platformdirs import user_config_dir
 from pathlib import Path
@@ -128,6 +128,7 @@ class Database:
                   artists.artist_locale, 
                   artists.ended, 
                   artists.last_checked, 
+                  albums.release_group_mbid,
                   albums.album_title, 
                   albums.release_type, 
                   albums.release_date 
@@ -143,7 +144,7 @@ class Database:
         artists = {}
 
         for row in rows:
-            artist_mbid, artist_name, artist_locale, ended, last_checked, album_title, release_type, release_date, = row
+            artist_mbid, artist_name, artist_locale, ended, last_checked, release_group_mbid, album_title, release_type, release_date, = row
 
             if not artist_mbid in artists:
                 artists[artist_mbid] = CachedArtist (
@@ -156,6 +157,7 @@ class Database:
 
             if album_title is not None:
                 artists[artist_mbid].albums.append({
+                        "release_group_mbid": release_group_mbid,
                         "album_title": album_title,
                         "release_type": release_type,
                         "release_date": release_date,
@@ -259,7 +261,7 @@ class Database:
         rows = ({
             "release_group_mbid": album["release_group_mbid"],
             "artist_mbid": artist.artist_mbid,
-            "title": album["title"],
+            "title": album["album_title"],
             "release_type": album["release_type"],
             "release_date": album["release_date"],
         } for album in artist.albums)

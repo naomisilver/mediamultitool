@@ -4,7 +4,7 @@ from .playlist.import_lastfm import scrape_lastfm_playlist
 from .updater.load_album import get_newest_album, fix_artist_match
 from .user_paths import DB_PATH, DEFAULT_OUTPUT_DIR, ensure_default_output_path
 
-from .models import PlaylistConfig, UpdaterConfig
+from .core.models import PlaylistConfig, UpdaterConfig
 
 from pathlib import Path 
 import logging
@@ -30,7 +30,7 @@ def run(args, cfg):
         if args.output_dir is not None: # stopped defaulting to the input file location as an output because there wouldn't be one for a url, cleans up run slightly too
             output_dir = Path(args.output_dir)
         else:
-            output_dir = Path(cfg.core.default_output)
+            output_dir = Path(cfg.core.default_output) if cfg.core.default_output else DEFAULT_OUTPUT_DIR
 
         playlist_cfg = PlaylistConfig(
             local_music_path = Path(cfg.core.local_music_path),
@@ -111,8 +111,6 @@ def run(args, cfg):
             },
             excluded_artists = excluded_list
         )
-
-        print(updater_cfg.output_dir)
 
         if args.refresh:
             artist_name = [x.lower() for x in args.refresh]
