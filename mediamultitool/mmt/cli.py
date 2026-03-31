@@ -1,9 +1,9 @@
 from .main import run
 from ..config import load_config
+from .user_paths import APP_DIR, LOG_PATH, REPO_LINK, CONFIG_PATH, ensure_paths
 
 from logging.handlers import RotatingFileHandler
 from argparse import ArgumentParser
-from platformdirs import user_config_dir
 from pathlib import Path
 
 import argparse
@@ -11,16 +11,18 @@ import os
 import logging
 import sys
 import webbrowser
+import platform
+import subprocess
 
 """
-TODO:   
+TODO:
     - look at improving console logging by using rich
 """
 
 class CustomFormatter(logging.Formatter):
     grey = "\x1b[38;239m"
     green = "\x1b[38;5;48m"
-    yellow = "\x1b[33;5;222m"
+    yellow = "\x1b[38;5;222m"
     red = "\x1b[31;20m"
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
@@ -37,8 +39,24 @@ class CustomFormatter(logging.Formatter):
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt, datefmt="%m/%d/%y %H:%M:%S")
         return formatter.format(record)
+    
+def open_file(path: Path):
+    """ helper to platform agnostically open a given path """
+
+    try:
+        system = platform.system()
+        if system == "Windows":
+            os.startfile(path)
+        elif system == "Darwin":
+            subprocess.run(["open", path], check=True)
+        else:
+            subprocess.run(["xdg-open", path], check=True)
+    except Exception as e:
+        logger.error(f"Failed to open file: {e}")
 
 def validate_input(parser, args, cfg, APP_DIR): # there HAS to be a better way handle induvidual param validation ts getting out of control
+    """ validate argsparse inputs """
+
     try:
         if args.command == "playlist":
             if args.input_param is None: # if directory is not provided
@@ -56,10 +74,10 @@ def validate_input(parser, args, cfg, APP_DIR): # there HAS to be a better way h
                 else:
                     parser.error("default output in the configuration file is not valid, please change, -c/--c to open config file")
 
-            if cfg.playlist.local_storage_path == "": # if a known required value isn't given, will rely on something else to get user to fill out config when other features are added
+            if cfg.core.local_storage_path == "": # if a known required value isn't given, will rely on something else to get user to fill out config when other features are added
                 parser.error("-p/-playlist operation requires a path to local music files, -c/--config to open config file")
             else:
-                if Path(cfg.playlist.local_storage_path).is_dir():
+                if Path(cfg.core.local_storage_path).is_dir():
                     pass
                 else:
                     parser.error("path to local storage is not quite right, please ensure this is correct")
@@ -79,16 +97,20 @@ def validate_input(parser, args, cfg, APP_DIR): # there HAS to be a better way h
                     parser.error("Directories require the -r/-recursive flag")
                 pass
 
+        if args.command == "updater":
+            if args.new and args.all:
+                parser.error("Both --new and --all are mutually exclusive, please pick one :)")
+
+            if args.only and args.excluding:
+                parser.error("Both --only and --excluding are mutually exclusive")
+
     except AttributeError:
         pass
 
 def mmt():
-    APP_NAME = "mediamultitool"
-    APP_DIR = Path(user_config_dir(APP_NAME))
-    LOG_DIR = APP_DIR / "logs"
-    LOG_PATH = APP_DIR / "logs" / "mmt.log"
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    REPO_LINK = "https://github.com/naomisilver/mediamultitool"
+    """ mediamultitool entry point """
+
+    ensure_paths()
 
     global logger
 
@@ -124,20 +146,31 @@ def mmt():
     
     # all common options (shared across commands)
     common_parser = argparse.ArgumentParser(add_help=False)
-    common_parser.add_argument("-r", "--recursive", action="store_true", help="perform action recursively") # this is going to be depricated in the future
+    #common_parser.add_argument("-r", "--recursive", action="store_true", help="perform action recursively") # this is going to be depricated in the future
 
     subparsers = parser.add_subparsers(dest="command", title="subcommands")
 
     # playlist subparsing
-    playlist_parser = subparsers.add_parser("playlist", aliases=["p"], parents=[common_parser])
+    playlist_parser = subparsers.add_parser("playlist", parents=[common_parser])
     playlist_parser.add_argument("input_param", nargs="+", type=str, help="Input Parameter (link to playlist or path to csv file)") # moving away from either single csv or dir of csv in
     playlist_parser.add_argument("-o", "--output", dest="output_dir", type=Path, help="Output directory") # favour of multiple inputs, with an optional output flag
     playlist_parser.set_defaults(command="playlist") 
 
     # cleaner subparsing
-    cleaner_parser = subparsers.add_parser("cleaner", aliases=["c"], parents=[common_parser])
+    cleaner_parser = subparsers.add_parser("cleaner", parents=[common_parser])
     cleaner_parser.set_defaults(command="cleaner")
 
+    # updater subparsing
+    updater_parser = subparsers.add_parser("updater", parents=[common_parser]) # moving away from the single letter commands
+    updater_parser.add_argument("-n", "--new", action="store_true", help="only compare against newer albums than is in your collection")
+    updater_parser.add_argument("-a", "--all", action="store_true", help="compare against all albums in your collection")
+    updater_parser.add_argument("-u", "--update-cache", dest="update_cache", action="store_true", help="update the local cache")
+    updater_parser.add_argument("-o", "--only", dest="only", nargs="+", type=str, help="scan for albums from the given artist(s)")
+    updater_parser.add_argument("-e", "--excluding", dest="excluding", nargs="+", type=str, help="scan for albums excluding the given artist(s)")
+    updater_parser.add_argument("-p", "--print", dest="print_console", action="store_true",help="Outputs missing albums to the console rather than file")
+    updater_parser.add_argument("-r", "--refresh-artist", dest="refresh", nargs=1, type=str, help="refresh a bad artist match")
+    updater_parser.set_defaults(command="updater")
+    
     args = parser.parse_args()
 
     try:
@@ -150,11 +183,11 @@ def mmt():
 
     if args.config:
         print(f"Opening config file at: {APP_DIR / 'config.toml'}", end='')
-        webbrowser.open(f"file:{APP_DIR / 'config.toml'}")
+        open_file(f"{CONFIG_PATH}")
         raise SystemExit
     if args.logs:
         print(f"Opening log file at: {LOG_PATH}") 
-        webbrowser.open(LOG_PATH) # **SHOULD** be platform agnostic if not need to look at alternatives (dont have anything apple or none headless Linux system atm)
+        open_file(LOG_PATH) # **SHOULD** be platform agnostic if not need to look at alternatives (dont have anything apple or none headless Linux system atm)
         raise SystemExit
     if args.github:
         print(f"Opening GitHub at: {REPO_LINK}")
@@ -184,4 +217,6 @@ if __name__ == "__main__":
               but when imported will not.
             - TL;DR, mediamultitool run as a user is the parent so I control the logging output and handlers and stuff, when imported,
               it is a child and so the parent program should dictate logging output (though I doubt this'll ever get imported to another proj)
+
+        - platform agnostic file opening: https://stackoverflow.com/questions/434597/open-document-with-default-os-application-in-python-both-in-windows-and-mac-os
 """

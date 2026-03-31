@@ -1,12 +1,14 @@
 [project]
 name = "mediamultitool"
-version = "0.2.1"
+version = "0.3.0"
 requires-python = ">= 3.11.9"
 dependencies = [
     "platformdirs",
     "tomlkit",
     "selenium",
-    "requests"
+    "requests",
+    "ratelimit",
+    "rich"
     ]
 description = "A multi-function cli tool to manage self hosted media"
 authors = [{name = "Naomi Silver", email = "naomisilver2002@gmail.com"}]
