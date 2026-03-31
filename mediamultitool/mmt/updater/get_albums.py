@@ -10,13 +10,7 @@ import logging
 import time
 
 """
-    - TODO:
-        - add a more precise rate limiting function so that I can really squeeze out that extra 100ms from the current time.sleep
 
-        - stretch goal for this branch is to add the ability to remap certain artist/mbid matchups. I don't think any of my current 300+ artists have had a mismatch
-          (aside from "F.U.N" because locally it's "FUN") where it either takes current albums from a given artist, searches to see if those albums belond to any of
-          the get_mbid artists and picks the right one, or present the user with a list of potential matches, and some of their studio albums to pick from, then update
-          the local record and wipes the record for that particular artist
 """
 
 API_ROOT = "https://musicbrainz.org/ws/2"
@@ -36,6 +30,7 @@ header = {
 # i while loop when getting albums so rate limiting a seperate helper function was the next best choice
 def mb_get(path, params) -> requests.Response:
     """ rate limited get for musicbrainz """
+    
     url = f"{API_ROOT}{path}"
     r = session.get(url, headers=header, params=params)
 
@@ -60,8 +55,8 @@ def fetch_many_artist_mbid(a_name: str) -> dict[CachedArtist]:
 
     artists = {}
 
-    for i in range(5):
-        try:
+    for i in range(5): # hardcoded for now, with headroom to let the user get the next set of artists if the 5 found aren't correct (didn't feel the need to
+        try: # as out of the 300 artists in collection, 1 ended up with a bad match and didn't struggle to match within the first 5 artists found)
 
             if data["artists"][i]["life-span"]["ended"]:
                 ended = True
@@ -94,24 +89,21 @@ def fetch_many_artist_mbid(a_name: str) -> dict[CachedArtist]:
 def fetch_artist_mbid(a_name) -> CachedArtist: # i kinda hated function annotations because clutter but now I'm working across multiple files with multiple functions it's quite nice
     """ fetches artist mbid of a provided local artist """
 
-    #check_limit() # the stackoverflow link credited in mb_ratelimit.py is genius and is/is going to be incredibly useful 
-
     payload = {
         'query': a_name, # fuzzy search
         'fmt': 'json'
     }
     r = mb_get("/artist", payload)
-    # r = session.get(f"{API_ROOT}/artist", headers=header, params=payload)
+
     logger.debug(r.status_code) # for something so heavily rate limited it is very handy knowing this
     data = r.json()
 
     try:
-        if data["artists"][0]["score"] <= 85: # mb ranks artist searches with a "confidence score", i don't think it would ever happen but prevent bad matches 
+        if data["artists"][0]["score"] <= 85: # score floor for matching artists
             logger.warning("Low confidence match for: %s, closest match is: %s", a_name, data["artists"][0]["name"])
             return None # nothing has changed so no need to return anything
 
-        if data["artists"][0]["life-span"]["ended"]: # praise the lord they expose this, will probably save all albums to ended artists on the first run then
-            # rarely if ever recheck
+        if data["artists"][0]["life-span"]["ended"]: # W musicbrainz for exposing this
             ended = True # https://www.youtube.com/watch?v=neJpZTAu-Ig (i'm slowly losing my mind)
         else: 
             ended = False
@@ -139,20 +131,19 @@ def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
     
     query = (
         f"arid:{artist.artist_mbid} AND primarytype:(album OR single OR ep) "
-        #"AND NOT secondarytype:live "
-        #"AND NOT secondarytype:compilation "
-        "AND NOT secondarytype:remix "
-        "AND NOT secondarytype:interview "
+        #"AND NOT secondarytype:live " # I currently cache everything as new records in the local cache, it's slightly wasteful as a user who only ever checks studio_albums
+        #"AND NOT secondarytype:compilation " # will never need the other 4 album types, but for one, you can't JUST query for studio albums as you can't query for the abscence 
+        "AND NOT secondarytype:remix " #  of a value, only excluding the existance of a value. so I get these albums anyway. The major downside is that a query for a big artist
+        "AND NOT secondarytype:interview " # may take a second or two extra
         "AND NOT secondarytype:soundtrack "
         "AND NOT secondarytype:demo "
         "AND NOT secondarytype:mixtape/street "
-        #"AND NOT status:bootleg "
+        #"AND NOT status:bootleg " # this didn't end up working, I don't *think* I'm getting much extra noise but I'm keeping an eye on it :D
     )
 
     limit = 100
     offset = 0
-    score_floor = 85 # 88 still get *some* of the right albums, but < 88 has a bit too much noise, > 88 exlcudes many "best of" or "greatest hits" albums, need to
-    # try and see if the json data is not sequentially given in terms of the score, maybe a score 75 is listed above a 90 and so I break too soon to capture that
+    score_floor = 85 # 88 still get *some* of the right albums, but < 88 has a bit too much noise, > 88 exlcudes many "best of" or "greatest hits" albums
     score_thresh = True
 
     while score_thresh: # continue to increase offset until the current iteration of results is below the score threshold
@@ -165,7 +156,7 @@ def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
         }
 
         r = mb_get("/release-group", payload)
-        # r = session.get(f"{API_ROOT}/release-group", headers=header, params=payload)
+
         data = r.json()
 
         for rg in data["release-groups"]:
@@ -178,39 +169,33 @@ def fetch_artist_albums(artist: CachedArtist) -> CachedArtist:
             release_group_mbid = rg["id"]
 
             try:
-                #release_date = rg["first-release-date"].split("-", 1)[0]
                 release_date = rg["first-release-date"]
             except KeyError as e:
-                continue # this was causing some weird behaviour, specifically for the band "american football", it would find an album "all of us" that doesn't exist
-            # when I pull the same data from the same url it'd be using, so instead skip instances of this. 
+                continue # i shouldn't need to try catch this anymore as it was getting caught on splitting the release date, some albums have full iso 8601 date and some don't
 
             if rg["primary-type"].lower() != "album":
                 if rg["primary-type"].lower() == "single": # singles also include singles of tracks later released in an actual album, again, idrk if I can do someting
                     # about that as some artists will release singles and NOT later release them as part of an album which is the use case I'm trying to capture
-                    #artist.singles.append(f"{normalise(title)} ({release_date})")
                     artist.albums.append({"release_group_mbid": release_group_mbid, "album_title": f"{normalise(title)}", "release_date": release_date, "release_type": "single"})
 
                 if rg["primary-type"].lower() == "ep": # some eps seem to be seen as studio albums from musicbrainz and idrk if I can do anything about that
                     # and it seems to include "sessions" like aol and shit, will look into if I can set a param to ignore them
-                    #artist.eps.append(f"{normalise(title)} ({release_date})")
                     artist.albums.append({"release_group_mbid": release_group_mbid, "album_title": f"{normalise(title)}", "release_date": release_date, "release_type": "ep"})
                 
-                continue # the messy appends NEED to be sorted, I'm just deadass repeating the same append statement 5 times, im too tired to sort that, I just need to test
-            # my new database/database methods
+                continue
 
             try:
                 for st in rg["secondary-types"]:
                     if "live" in st.lower():
-                        #artist.live_albums.append(f"{normalise(title)} ({release_date})")
                         artist.albums.append({"release_group_mbid": release_group_mbid, "album_title": f"{normalise(title)}", "release_date": release_date, "release_type": "live_album"})
+
                     if "compilation" in st.lower():
-                        #artist.compilations.append(f"{normalise(title)} ({release_date})")
                         artist.albums.append({"release_group_mbid": release_group_mbid, "album_title": f"{normalise(title)}", "release_date": release_date, "release_type": "compilation"})
 
             except KeyError:
                 artist.albums.append({"release_group_mbid": release_group_mbid, "album_title": f"{normalise(title)}", "release_date": release_date, "release_type": "studio_album"})
 
-        count = data["count"] # if the count value indicating the amount of results isn't present, break after the first cycle as theres no pages to ination XD
+        count = data["count"] # if the count value indicating the amount of results isn't present, break after the first cycle as theres no pages to ination xD
         if count is None:
             break
 

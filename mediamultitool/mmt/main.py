@@ -54,14 +54,6 @@ def run(args, cfg):
                     print() # probably be handled using a similar method to last.fm with scraping
         
         else:
-            #if args.recursive: # will very likely make this defunct in the future, I prefer the idea of multiple inputs
-                # over one input with many potential input files. Depends what this all looks like when i add lastfm, spotify etc...
-                # scraping/api parsing
-            #    for i in input_params:
-            #        csv_files = [x for x in Path(i).iterdir() if x.suffix == ".csv"] # make list of csv files
-            #        for csv_file in csv_files:
-            #            convert_csv(csv_file, playlist_cfg)
-
             for i in input_params: # args.input_param now gives a list so iterate through
                 csv_file_path = Path(i) 
                 convert_csv(csv_file_path, playlist_cfg)
@@ -72,7 +64,7 @@ def run(args, cfg):
 
     if args.command == "updater":
 
-        all_or_new = (
+        all_or_new = ( # nested ternary to figure out what to output, based on hierarchy. Console options take precedence over config, config take precedence over default
             True if args.all
             else False if args.new
             else True if cfg.updater.check_new_or_all == "all"
@@ -82,7 +74,7 @@ def run(args, cfg):
 
         try:
             excluded_list = [x.lower() for x in args.excluding]
-        except TypeError:
+        except TypeError: # can't generate a list from args that were never given
             excluded_list = []
 
         try:

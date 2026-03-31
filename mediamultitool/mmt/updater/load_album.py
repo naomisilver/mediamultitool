@@ -23,10 +23,7 @@ from rich.live import Live
 logger = logging.getLogger(__name__)
 
 """
-TODO:
-    - Look at a more elegant way to handle user interaction for 'fix_artist_match', I'm going to look into click as an alternative to argparse
-      as it has user input prompts built-in which is nice and then rich as a potential option for stdout. Rich also has progress bars which would spice
-      up the long waits for querying mb. Can replace outputting every found artist for a loading bar showing the most recent downloaded
+
 """
 
 def regex_tag_check(s: str) -> int:
@@ -65,11 +62,11 @@ def normalise_album(s: str) -> str:
 def parse_partial_date(s: str) -> date:
     """ helper to normalise when musicbrainz gives only year or year-month """
 
-    parts = s.split("-")
+    parts = s.split("-") # YEAR-MONTH-DAY / 2000-01-01
 
     year = int(parts[0])
     month = int(parts[1]) if len(parts) > 1 else 1
-    day = int(parts[2]) if len(parts) > 2 else 1
+    day = int(parts[2]) if len(parts) > 2 else 1 # makes just the year "2000" return as "2000-1-1" so i can compare dates against each other
 
     return date(year, month, day)
 
@@ -263,9 +260,9 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
             if upd_cfg.output_to_console:
                 logger.debug("Missing %s %ss for artist %s: %s", len(missing), album_type, local_artist.artist_name, missing)
                 ui.updater_missing_albums_all(local_artist.artist_name, missing, album_type)
-            # a quirk of this implementation is that when printing the missing table with more than one album type not ignored (e.g., studio_albums and eps)
-            # it outputs both as induvidual rows and I think that is the best way, that way it's clear that I'm mising say 1 studio album from the rolling stones
-            # and 136 eps rather than it appearing as i'm missing 137 albums total (that's a real comparison, what were the rolling stones smoking)
+                # a quirk of this implementation is that when printing the missing table with more than one album type not ignored (e.g., studio_albums and eps)
+                # it outputs both as induvidual rows and I think that is the best way, that way it's clear that I'm mising say 1 studio album from the rolling stones
+                # and 136 eps rather than it appearing as i'm missing 137 albums total (that's a real comparison, what were the rolling stones smoking)
             else:
                 logger.debug("Missing %s %ss for artist %s: %s", len(missing), album_type, local_artist.artist_name, missing)
                 ui.updater_missing_albums_one(local_artist.artist_name, missing, album_type)

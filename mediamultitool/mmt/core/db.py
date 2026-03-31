@@ -11,20 +11,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-one_minute_unix_time = 60
-one_hour_unix_time = 3600
-one_day_unix_time = 86400 # somewhat temporary while testing
 one_week_unix_time = 604800
 
 """
     TODO:
         - I really need to find a way to condense these methods, I'm repeating the same steps and espc for db.add(), docstrings as part of a callable should be illegal
-
-        - it's also currently not very polymorphic of me right me, but I want to get the rest of it working before
-
-        - check the schema added in https://github.com/naomisilver/mediamultitool/issues/10 for new schema. 
-            - on lookup for artist's albums (where the artist already exists and last checked is not less thna a week), I can DELETE from albums where artist_mbid matches then
-              reinsert, meaning existing cached items stay up to date and solves for issues where musicbrainz misrepresents an artists albums.
 """
 
 class Database:
@@ -39,18 +30,6 @@ class Database:
         """ create the database and table """
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
-        #c.execute("""CREATE TABLE artists (
-        #          artist_mbid text PRIMARY KEY,
-        #          artist_name text NOT NULL UNIQUE,
-        #          artist_locale text NOT NULL,
-        #          ended integer NOT NULL,
-        #          last_checked integer NOT NULL,
-        #          studio_albums text,
-        #          eps text,
-        #          singles text,
-        #          compilations text,
-        #          live_albums text
-        #          )""")
         
         c.execute("""CREATE TABLE artists (
                   artist_mbid text PRIMARY KEY,
@@ -68,11 +47,6 @@ class Database:
                   release_date text NOT NULL,
                   FOREIGN KEY (artist_mbid) REFERENCES artists (artist_mbid)
                   )""")
-
-        # mbid will be the primary key because it is wholey unique, annoyingly, I can't using it to search the db initially because that is the first thing I need from musicbrainz, I *could*
-        # use lastfm to pull the mbid but then if there's a mismatch for whatever reason, it'll be annoying to find why I'm getting incorrect data
-        # so instead, we use the artist_name as the index, what I'll be using to compare what there is locally to the DB, if that artist's name is in the db, we can assume we already have
-        # their mbid, meaning I can skip checking for it
         
         logger.debug("Created DB at %s", self.db_path)
         
@@ -99,19 +73,6 @@ class Database:
             return False
         
         return True
-        
-        #return CachedArtist(
-        #    artist_mbid = row[0],
-        #    artist_name = row[1],
-        #    artist_locale = row[2],
-        #    ended = row[3],
-        #    last_checked = row[4],
-        #    studio_albums = json.loads(row[5]),
-        #    eps =  json.loads(row[6]),
-        #    singles = json.loads(row[7]),
-        #    compilations = json.loads(row[8]),
-        #    live_albums = json.loads(row[9])
-        #)
         
     def is_stale(self) -> list[CachedArtist]:
         """ checks for 'stale' artists to refresh cache """
@@ -212,7 +173,8 @@ class Database:
 
         return artist
     
-    def retrieve_artist_names(self):
+    def retrieve_artist_names(self) -> list[str]:
+        """ gets all current artists by their name in the local cache """
 
         artists = []
 
@@ -282,6 +244,8 @@ class Database:
         conn.close()
 
     def remove(self, a_names: list):
+        """ removes artist record from local cache"""
+
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
 
@@ -302,9 +266,7 @@ class Database:
         c.execute(query, a_mbids)
 
         conn.commit()
-        conn.close()
-
-        
+        conn.close() 
 
 """
     Sources/credit:
