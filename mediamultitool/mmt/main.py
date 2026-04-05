@@ -91,6 +91,9 @@ def run(args, cfg):
             output_dir = Path(cfg.core.default_output) if cfg.core.default_output else DEFAULT_OUTPUT_DIR,
             db_path = DB_PATH,
             update_cache = args.update_cache,
+            deezer_arl_token = cfg.updater.deezer_arl_token,
+            download_source = cfg.updater.download_source.lower(),
+            download = args.download,
             # all_or_new = True if cfg.updater.check_new_or_all.lower() == "all" else False, # had it inverse but I'd prefer it defaults to new if it isn't explcitly "all"
             all_or_new = all_or_new,
             output_to_console = args.print_console,

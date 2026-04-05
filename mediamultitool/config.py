@@ -45,10 +45,12 @@ class UpdaterConfig:
     ignore_live_albums: bool = False
     check_new_or_all: str = ''
     excluded: str = ''
+    deezer_arl_token: str = ''
+    download_source: str = 'deezer'
 
 @dataclass(slots=True)
 class Misc:
-    version: str = '0.1.4'
+    version: str = '0.1.5'
 
 @dataclass(slots=True)
 class AppConfig:

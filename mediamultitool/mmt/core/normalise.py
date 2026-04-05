@@ -1,10 +1,12 @@
-def normalise(s):
+import re
+
+def normalise(s): # will need a name change in the future, but changing this now means editing half a dozen files and not required rn
     """ small helper to strip down to the absolute bare required data for string/partial string matching """
     if s is None:
         s = "none" # for the instances of a user misinputting their API key and last.fm returns a bunch of nulls or last.fm api can't find an album for a specific track
 
     s = s.lower().strip()
-    illegal = '<>:"/\\|?*\''
+    illegal = '<>:"/!\\|?*\'~'
     s = "".join(c for c in s if c not in illegal) # solves the general case of illegal os characters (breaks AC/DC but is solved by discrete artist search)
     s = s.rstrip(".") # solves the case of hkmori's "i just want to be your friend..."
     s = s.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"') # "holy grail’" vs "holy grail'" this is to catch for musicbrainz entries
