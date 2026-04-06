@@ -146,11 +146,11 @@ def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalAr
 
         return missing
 
-def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether I should include this here or move to a seperate file, will sleep on it
+def update_cache(local_artist_data: LocalArtist, db: Database, ui: RichUI): # unsure whether I should include this here or move to a seperate file, will sleep on it
     """ scans local collection, and updates local cache, based on existance/last_checked, from musicbrainz """
     
-    ui = RichUI()
-    ui.start()
+    #ui = RichUI()
+    #ui.start()
 
     index = 1
 
@@ -184,7 +184,7 @@ def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether
 
         db.add(updated_a)
 
-    ui.stop()
+    #ui.stop()
 
 def delete_local_missing(upd_cfg: UpdaterConfig, db: Database):
     """ removes artists no longer present in local collection and removes them from local cache """
@@ -230,7 +230,7 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
         logger.info("You have %s outdated artists, you may want to run 'mmt updater --update-cache'", len(stale_artists))
     
     if upd_cfg.update_cache or add_db_missing(upd_cfg, db): # this can be done better when I move each module to a class, this can be called/run the require logic from main
-        update_cache(local_artist_data, db)
+        update_cache(local_artist_data, db, ui)
     elif os.path.isfile(upd_cfg.db_path):
         pass
     else:

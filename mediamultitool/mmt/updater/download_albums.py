@@ -1,12 +1,15 @@
 from ..core.models import UpdaterConfig
 from ..core.normalise import normalise
-
+from .streamrip_client import StreamripClient
 from .get_album_id import get_deezer_artist_id, get_deezer_album_id, get_fuzzy_deezer_album_id, get_album_name_from_id
+from streamrip.progress import clear_progress
+from streamrip.media import remove_artwork_tempdirs
 
 from rich import print # so helpful when looking at printed dicts and lists oh my
 import re
 import logging
 from pathlib import Path
+import asyncio
 
 """
     - I'm beholden to what deezer provides and contains and so so there's some noise, some error and weird edge cases like +44/plus 44
@@ -62,6 +65,20 @@ def get_source(upd_cfg: UpdaterConfig, missing_albums: dict[str, dict[str, list[
             print(f"{id}: {get_album_name_from_id(id)}") # im lazy and having a quick way to confirm what gets found is awesome
 
         print(len(to_download))
+
+        asyncio.run(run_downloads(upd_cfg, to_download))
+
+async def run_downloads(upd_cfg: UpdaterConfig, to_download):
+    sr_client = StreamripClient(upd_cfg)
+    await sr_client.init_client()
+
+    try:
+        for id in to_download:
+            await sr_client.deezer_rip(id)
+    finally:
+        await sr_client.close()
+        clear_progress()
+        remove_artwork_tempdirs()
 
 def get_deezer_ids(upd_cfg: UpdaterConfig, missing_albums: dict[str, dict[str, list[str]]]) -> list[int]:
     """ builds list of missing album ids """
