@@ -4,8 +4,9 @@ from .streamrip_client import StreamripClient
 from .get_album_id import get_deezer_artist_id, get_deezer_album_id, get_fuzzy_deezer_album_id, get_album_name_from_id
 from streamrip.progress import clear_progress
 from streamrip.media import remove_artwork_tempdirs
+from ..core.richui import RichUI
 
-from rich import print # so helpful when looking at printed dicts and lists oh my
+#from rich import print # so helpful when looking at printed dicts and lists oh my
 import re
 import logging
 from pathlib import Path
@@ -58,15 +59,15 @@ def further_normalisation(s: str) -> str:
 def get_source(upd_cfg: UpdaterConfig, missing_albums: dict[str, dict[str, list[str]]]):
     """ determines which download source to use """
 
+    ui = RichUI()
+    ui.start()
+
     if upd_cfg.download_source.lower() == "deezer":
-        to_download = get_deezer_ids(upd_cfg, missing_albums)
+        to_download = get_deezer_ids(upd_cfg, ui, missing_albums)
 
-        for id in to_download:
-            print(f"{id}: {get_album_name_from_id(id)}") # im lazy and having a quick way to confirm what gets found is awesome
+    ui.stop()
 
-        print(len(to_download))
-
-        asyncio.run(run_downloads(upd_cfg, to_download))
+    asyncio.run(run_downloads(upd_cfg, to_download))
 
 async def run_downloads(upd_cfg: UpdaterConfig, to_download):
     sr_client = StreamripClient(upd_cfg)
@@ -80,7 +81,7 @@ async def run_downloads(upd_cfg: UpdaterConfig, to_download):
         clear_progress()
         remove_artwork_tempdirs()
 
-def get_deezer_ids(upd_cfg: UpdaterConfig, missing_albums: dict[str, dict[str, list[str]]]) -> list[int]:
+def get_deezer_ids(upd_cfg: UpdaterConfig, ui: RichUI,  missing_albums: dict[str, dict[str, list[str]]]) -> list[int]:
     """ builds list of missing album ids """
 
     to_download = []
@@ -131,6 +132,9 @@ def get_deezer_ids(upd_cfg: UpdaterConfig, missing_albums: dict[str, dict[str, l
 
                     if norm_title not in remove_duplicates:
                         remove_duplicates[norm_title] = data
+
+                        ui.matched_album_ids(artist, data, title)
+
                         continue
 
                     if not remove_duplicates[norm_title]["explicit_lyrics"] and data["explicit_lyrics"]: 
@@ -139,7 +143,7 @@ def get_deezer_ids(upd_cfg: UpdaterConfig, missing_albums: dict[str, dict[str, l
                 # ids found from artist album listing
                 matched_ids = [data["album_id"] for data in remove_duplicates.values()]
 
-                print(matched_ids) # will be replaced with rich live table when i come to adding ui elements
+                #print(matched_ids) # will be replaced with rich live table when i come to adding ui elements
 
                 to_download.extend(matched_ids)
 
@@ -166,7 +170,10 @@ def get_deezer_ids(upd_cfg: UpdaterConfig, missing_albums: dict[str, dict[str, l
                             if normalise(res["artist_name"]) != normalise(artist):
                                 continue
 
-                        to_download.append(res["id"])
+                        to_download.append(res["album_id"])
+
+                        ui.matched_album_ids(artist, res, res_title)
+
                         break
 
                 if matched_ids or still_missing:

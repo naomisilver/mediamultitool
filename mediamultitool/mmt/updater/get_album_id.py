@@ -95,7 +95,7 @@ def get_fuzzy_deezer_album_id(album_name: str, artist_name: str):
         for album in data["data"]:
 
             albums.append({
-                "id": album['id'],
+                "album_id": album['id'],
                 "title": album['title'],
                 "explcit_lyrics": album['explicit_lyrics'],
                 "record_type": album['record_type'],
