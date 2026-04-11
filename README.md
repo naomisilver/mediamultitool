@@ -100,6 +100,17 @@ Or you can compare only the given artist(s):
 mmt updater --only <artist_name> <artist_name>
 ```
 
+> [!WARNING]
+> To successfully download albums from Deezer, you need to provide your Deezer ARL token in the `config.toml` file, reachable by running `mmt -c`. To obtain your token, follow this [guide](https://github.com/nathom/streamrip/wiki/Finding-Your-Deezer-ARL-Cookie) by streamrip, an writeup in this repo will be added in due time. Also note that currently deezer downloads are limited to 128kbps bitrate, while streamrip allows for higher quality downloads with a paying subscription, it is hardcoded at the highest rate of a non-paying user. This will be editable in the future with the addition of more download sources.
+
+With the local cache created and any mismatches corrected, you have seen the albums that you are missing in your local collection. You can now add `-d/--download` the end of your updater command. This will retrieve all the Deezer album IDs of those albums, then download them. To do this, run the follow command (this can be combined with any of the previous commands for much finer control over whose albums you download :D):
+
+```
+mmt updater -d
+```
+
+
+
 > This is only a brief foray into the potential uses for the current modules, for a deeper dive into all possible options and usages, see the [wiki](https://github.com/naomisilver/mediamultitool/wiki)
 
 # Issues/feature requests/contributions

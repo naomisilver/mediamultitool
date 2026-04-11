@@ -59,6 +59,14 @@ check_new_or_all = ''
 # or "Artist Collection". Seperate entries here using a command (,)
 excluded = 'Various Artists, Playlists'
 
+# required when downloading music from deezer, to get your token, follow this guide:
+# https://github.com/nathom/streamrip/wiki/Finding-Your-Deezer-ARL-Cookie
+deezer_arl_token = ''
+
+# this determines which source to download music from. Currently only Deezer is supported with plans to support Qobuz
+# in the future.
+download_source = 'deezer'
+
 [app.misc]
 # versioning DO NOT CHANGE
-version = '0.1.4'
+version = '0.1.5'

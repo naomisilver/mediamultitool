@@ -2,6 +2,7 @@ from ..core.models import LocalArtist, CachedArtist, UpdaterConfig
 from ..core.richui import RichUI 
 
 from .get_albums import fetch_artist_albums, fetch_artist_mbid, fetch_many_artist_mbid
+from .download_albums import get_source
 
 from ..core.normalise import normalise
 from ..core.db import Database
@@ -140,16 +141,19 @@ def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalAr
         for item in db_items:
             db_year = regex_tag_check(f"({item['release_date'].split("-")[0]})")
 
-            if db_year > local_year:
-                missing.append(f"{item['album_title']} ({db_year})")
+            try:
+                if db_year > local_year:
+                    missing.append(f"{item['album_title']} ({db_year})")
+            except TypeError: # I hadn't checked the edge case of just an artist directory with no albums inside
+                missing.append(f"{item['album_title']} ({db_year})") # would fail because there's no album to check it against
 
         return missing
 
-def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether I should include this here or move to a seperate file, will sleep on it
+def update_cache(local_artist_data: LocalArtist, db: Database, ui: RichUI): # unsure whether I should include this here or move to a seperate file, will sleep on it
     """ scans local collection, and updates local cache, based on existance/last_checked, from musicbrainz """
     
-    ui = RichUI()
-    ui.start()
+    #ui = RichUI()
+    #ui.start()
 
     index = 1
 
@@ -183,7 +187,7 @@ def update_cache(local_artist_data: LocalArtist, db: Database): # unsure whether
 
         db.add(updated_a)
 
-    ui.stop()
+    #ui.stop()
 
 def delete_local_missing(upd_cfg: UpdaterConfig, db: Database):
     """ removes artists no longer present in local collection and removes them from local cache """
@@ -229,7 +233,7 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
         logger.info("You have %s outdated artists, you may want to run 'mmt updater --update-cache'", len(stale_artists))
     
     if upd_cfg.update_cache or add_db_missing(upd_cfg, db): # this can be done better when I move each module to a class, this can be called/run the require logic from main
-        update_cache(local_artist_data, db)
+        update_cache(local_artist_data, db, ui)
     elif os.path.isfile(upd_cfg.db_path):
         pass
     else:
@@ -241,6 +245,8 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
     for local_artist in local_artist_data:
         db_artist = db.retrieve_albums(local_artist.artist_name.lower())
 
+        missing_albums[local_artist.artist_name] = {} # accidently recreating the dictionary item every iteration so would end up 
+        # only with the 
         for album_type, ignore in upd_cfg.ignore.items():
             if ignore:
                 continue
@@ -253,7 +259,7 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
             if not missing:
                 continue
 
-            missing_albums[local_artist.artist_name] = {} # only used in writing to a json file, kind of a stopgap until downloading is implemented
+            # only used in writing to a json file, kind of a stopgap until downloading is implemented
             missing_albums[local_artist.artist_name][f"{album_type}s"] = missing # then -d/--download would output the small table and write the json file
             # downloader.py would then take over, using the most recent json file as the stock to download from
 
@@ -269,7 +275,13 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
 
     ui.stop()
 
-    if not upd_cfg.output_to_console:
+    missing_albums = {k: v for k, v in missing_albums.items() if v} # efficient "empty" dict items https://stackoverflow.com/questions/12118695/efficient-way-to-remove-keys-with-empty-strings-from-a-dict
+    # moving the dict key declaration out of the loop, it now generates the key even if there is no missing albums of any type 
+
+    if upd_cfg.download:
+        get_source(upd_cfg, missing_albums)
+
+    elif not upd_cfg.output_to_console:
         write_output_to_json(upd_cfg, missing_albums)
 
 def write_output_to_json(upd_cfg: UpdaterConfig, missing_albums: dict[str: list[str]]):

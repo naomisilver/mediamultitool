@@ -27,7 +27,7 @@ class PlaylistConfig:
     local_music_path: Path
     container_root: Path
     output_path: Path
-    lastfm_api_key: str | None # nullable because a user may not want to convert last.fm playlists
+    lastfm_api_key: str = None # nullable because a user may not want to convert last.fm playlists
     blocklist_strs: list[str] = field(default_factory=list) # default to an empty list
     allowlist_strs: list[str] = field(default_factory=list)
     artist_aliases: dict[str, str] = field(default_factory=dict)
@@ -38,7 +38,10 @@ class UpdaterConfig: # small now but will make things easier if I do move to aut
     output_dir: Path
     db_path: Path
     update_cache: bool
+    download_source: str
+    download: bool
     all_or_new: bool
+    deezer_arl_token: str = None
     output_to_console: bool = False
     ignore: dict[str, bool] = field(default_factory=dict) # store the ignores in a dictionary so I can iterate over it, no more big if block
     excluded_artists: list = field(default_factory=list) 
