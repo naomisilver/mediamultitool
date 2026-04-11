@@ -14,6 +14,7 @@ class RichUI:
         self.missing_tracks = []
         self.matching_tracks = []
         self.missing_albums = []
+        self.matching_ids = []
         self.current_artist_name = None
 
         self.con = Console()
@@ -78,6 +79,9 @@ class RichUI:
 
         if self.missing_albums:
             renderables.append(self._make_missing_albums_table())
+
+        if self.matching_ids:
+            renderables.append(self._make_matched_album_ids_table())
 
         return Group(*renderables)
 
@@ -167,6 +171,25 @@ class RichUI:
             table.add_row(*r)
 
         return table
+    
+    def _make_matched_album_ids_table(self):
+        """ table creation for matched album ids for mmt updater -d/--download """
+
+        table = self._new_table(title="Matched IDs", title_style = self.info_style)
+        table.add_column("Artist", width=28, style=self.warning_style, header_style=self.info_style, no_wrap=True)
+        table.add_column("ID(s)", width=18, style=self.warning_style, header_style=self.info_style, no_wrap=True)
+        table.add_column("Album Title", width=48, style=self.warning_style, header_style=self.info_style, no_wrap=True)
+
+        for r in self.matching_ids:
+            table.add_row(*r)
+
+        return table
+
+    def matched_album_ids(self, artist_name: str, album: dict, title: str):
+
+        self.matching_ids.append((artist_name, str(album["album_id"]), title))
+        self.matching_ids = self.matching_ids[-5:]
+        self.refresh()
 
     def artist_albums_updated(self, a: CachedArtist, count: int):
         """ row logic for updating the local cache for mmt updater -u/--update-cache limited to 5 most recent gets """

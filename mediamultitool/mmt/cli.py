@@ -169,6 +169,7 @@ def mmt():
     updater_parser.add_argument("-e", "--excluding", dest="excluding", nargs="+", type=str, help="scan for albums excluding the given artist(s)")
     updater_parser.add_argument("-p", "--print", dest="print_console", action="store_true",help="Outputs missing albums to the console rather than file")
     updater_parser.add_argument("-r", "--refresh-artist", dest="refresh", nargs=1, type=str, help="refresh a bad artist match")
+    updater_parser.add_argument("-d", "--download", action="store_true", help="download the found missing albums")
     updater_parser.set_defaults(command="updater")
     
     args = parser.parse_args()
