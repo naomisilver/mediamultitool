@@ -141,8 +141,11 @@ def compare_albums(upd_cfg: UpdaterConfig, db_items: list, local_artist: LocalAr
         for item in db_items:
             db_year = regex_tag_check(f"({item['release_date'].split("-")[0]})")
 
-            if db_year > local_year:
-                missing.append(f"{item['album_title']} ({db_year})")
+            try:
+                if db_year > local_year:
+                    missing.append(f"{item['album_title']} ({db_year})")
+            except TypeError: # I hadn't checked the edge case of just an artist directory with no albums inside
+                missing.append(f"{item['album_title']} ({db_year})") # would fail because there's no album to check it against
 
         return missing
 
