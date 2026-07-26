@@ -287,10 +287,10 @@ def process_local_artists(upd_cfg: UpdaterConfig, local_artist_data: LocalArtist
 def write_output_to_json(upd_cfg: UpdaterConfig, missing_albums: dict[str: list[str]]):
     """ writes the given dict to json file """
     
-    json_filename = str(datetime.now())
-    json_filename = json_filename.replace(":", "-")
+    json_filename = str(datetime.now()).replace(":", " ")
     json_path = Path(upd_cfg.output_dir / f"{json_filename[:19]}.json")
-    with open(json_path, "w") as f:
+    logger.warning("%s", json_path)
+    with open(json_path, "w", encoding="utf-8") as f: # supposedly python in linux defaults to utf-8 but windows does not
         json.dump(missing_albums, f, indent=4, ensure_ascii=False)
 
     logger.info("Written missing albums to '%s'", json_path)
