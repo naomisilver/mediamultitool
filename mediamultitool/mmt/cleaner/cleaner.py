@@ -54,7 +54,7 @@ def combine_artist(dl_path):
 
     
     for i in range (len(dir_list)):
-        parts = dir_list[i].split("-", 1)
+        parts = dir_list[i].split(" - ", 1)
 
         if len(parts) < 2:
                 continue
