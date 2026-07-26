@@ -288,6 +288,7 @@ def write_output_to_json(upd_cfg: UpdaterConfig, missing_albums: dict[str: list[
     """ writes the given dict to json file """
     
     json_filename = str(datetime.now())
+    json_filename = json_filename.replace(":", "-")
     json_path = Path(upd_cfg.output_dir / f"{json_filename[:19]}.json")
     with open(json_path, "w") as f:
         json.dump(missing_albums, f, indent=4, ensure_ascii=False)
