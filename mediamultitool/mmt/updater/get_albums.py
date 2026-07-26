@@ -34,7 +34,12 @@ def mb_get(path, params) -> requests.Response:
     url = f"{API_ROOT}{path}"
     r = session.get(url, headers=header, params=params)
 
-    if r.status_code != 200:
+    while r.status_code == 503: # mb rate limiting avoidance
+        logger.debug("Musicbrainz request failed: %s %s -> %s; body=%r", path, params, r.status_code, r.text[:100])
+        time.sleep(PERIOD) # wait 1.01 seconds and try again
+        r = session.get(url, headers=header, params=params)
+
+    if r.status_code != 200 and r.status_code != 503: # mb rate limiting avoidance
         logger.warning("Musicbrainz request failed: %s %s -> %s; body=%r", path, params, r.status_code, r.text[:100])
 
         r.raise_for_status()
